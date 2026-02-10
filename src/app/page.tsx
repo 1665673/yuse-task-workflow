@@ -187,7 +187,7 @@ export default function TaskDemoPage() {
             </div>
           )}
 
-          <div className="mb-4 min-h-0 flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
+<div className="mb-4 max-h-[85vh] min-h-[50vh] overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
             <p className="mb-4 text-sm text-slate-500">
               {getFlowItemNavLabel(item)}
             </p>
