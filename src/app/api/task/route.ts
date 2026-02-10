@@ -1,18 +1,14 @@
 import { NextResponse } from "next/server";
-import { readFile } from "fs/promises";
-import path from "path";
+import taskSample from "@/data/task-sample.json";
 
+/**
+ * Serves the sample task. The JSON is imported so it's bundled at build time,
+ * which is required for serverless (e.g. Vercel / v0.dev) where the filesystem
+ * may not include public/ at runtime.
+ */
 export async function GET() {
   try {
-    const filePath = path.join(
-      process.cwd(),
-      "public",
-      "test",
-      "yuse-task-sample.v4.8.json"
-    );
-    const content = await readFile(filePath, "utf-8");
-    const task = JSON.parse(content);
-    return NextResponse.json(task);
+    return NextResponse.json(taskSample);
   } catch (error) {
     console.error("Failed to load task:", error);
     return NextResponse.json(

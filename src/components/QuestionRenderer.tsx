@@ -52,7 +52,9 @@ export function QuestionRenderer({ question, taskModel, onAnswer }: QuestionRend
       {/* Stem (题干) */}
       <div className="space-y-3">
         {stem.text && (
-          <p className="text-lg leading-relaxed">{stem.text}</p>
+          <p className="text-lg leading-relaxed text-slate-900">
+            {stem.text}
+          </p>
         )}
         {stem.imageAssetId && (
           <ImagePlaceholder
@@ -101,7 +103,11 @@ export function QuestionRenderer({ question, taskModel, onAnswer }: QuestionRend
               >
                 {showCorrect ? "✓" : showIncorrect ? "✗" : String.fromCharCode(65 + idx)}
               </span>
-              {opt.text && <span>{opt.text}</span>}
+              {opt.text && (
+                <span className="text-slate-900 font-medium">
+                  {opt.text}
+                </span>
+              )}
               {opt.imageAssetId && (
                 <ImagePlaceholder
                   taskModel={taskModel}

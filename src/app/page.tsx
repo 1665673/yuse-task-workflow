@@ -166,10 +166,10 @@ export default function TaskDemoPage() {
     const showQuestionGuidance = item.kind === "question" && item.question.guidance;
 
     return (
-      <main className="flex min-h-screen flex-col bg-slate-50 p-6">
-        <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
+      <main className="flex min-h-screen flex-col bg-slate-50 p-4 sm:p-6">
+        <div className="mb-4 mx-auto flex w-full max-w-2xl flex-1 flex-col min-h-0">
           {showStepGuidance && (
-            <div className="mb-4">
+            <div className="mb-3 flex-shrink-0">
               <GuidanceBlock
                 guidance={step.guidance!}
                 label={`Step: ${step.id}`}
@@ -178,7 +178,7 @@ export default function TaskDemoPage() {
           )}
 
           {showQuestionGuidance && item.kind === "question" && (
-            <div className="mb-4">
+            <div className="mb-3 flex-shrink-0">
               <GuidanceBlock
                 guidance={item.question.guidance!}
                 label="Question guidance"
@@ -186,7 +186,7 @@ export default function TaskDemoPage() {
             </div>
           )}
 
-          <div className="flex-1 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 min-h-0 flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
             {item.kind === "question" && (
               <>
                 <p className="mb-4 text-sm text-slate-500">
@@ -234,9 +234,9 @@ export default function TaskDemoPage() {
             )}
           </div>
 
-          {/* Continue button - for question items always at bottom; phase4/5/6 have Continue inside their view */}
+          {/* Continue button - for question items; kept in view on small screens */}
           {item.kind === "question" && (
-            <div className="mt-6 flex justify-end">
+            <div className="mb-4 flex flex-shrink-0 justify-end">
               <button
                 type="button"
                 onClick={handleFlowContinue}
