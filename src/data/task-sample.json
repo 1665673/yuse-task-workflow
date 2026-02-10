@@ -846,6 +846,59 @@
                   0
                 ]
               }
+            ],
+            "w2": [
+              {
+                "type": "text_image",
+                "stem": {
+                  "text": "customize"
+                },
+                "options": [
+                  {
+                    "imageAssetId": "img_194779cf40"
+                  },
+                  {
+                    "imageAssetId": "img_b8aea7a0f4"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  0
+                ]
+              },
+              {
+                "type": "text_image",
+                "stem": {
+                  "text": "customize"
+                },
+                "options": [
+                  {
+                    "imageAssetId": "img_194779cf40"
+                  },
+                  {
+                    "imageAssetId": "img_b8aea7a0f4"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  0
+                ]
+              },
+              {
+                "type": "text_image",
+                "stem": {
+                  "text": "customize"
+                },
+                "options": [
+                  {
+                    "imageAssetId": "img_194779cf40"
+                  },
+                  {
+                    "imageAssetId": "img_b8aea7a0f4"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  1
+                ]
+              }
             ]
           }
         },
@@ -853,7 +906,7 @@
           "id": "phase3_phrases",
           "type": "phase3_phrases",
           "phraseQuestions": {
-            "p2": [
+            "p1": [
               {
                 "type": "text_cloze",
                 "stem": {
@@ -899,6 +952,59 @@
                   },
                   {
                     "text": "timeline"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  0
+                ]
+              }
+            ],
+            "p2": [
+              {
+                "type": "text_cloze",
+                "stem": {
+                  "text": "We can ____ the design if needed."
+                },
+                "options": [
+                  {
+                    "text": "buy"
+                  },
+                  {
+                    "text": "revise"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  1
+                ]
+              },
+              {
+                "type": "text_cloze",
+                "stem": {
+                  "text": "This is the final ____ of the design."
+                },
+                "options": [
+                  {
+                    "text": "revision"
+                  },
+                  {
+                    "text": "version"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  0
+                ]
+              },
+              {
+                "type": "text_cloze",
+                "stem": {
+                  "text": "We can ____ the design if needed."
+                },
+                "options": [
+                  {
+                    "text": "revise"
+                  },
+                  {
+                    "text": "end"
                   }
                 ],
                 "correctOptionIndexes": [
@@ -1121,7 +1227,9 @@
         {
           "id": "phase5_sentences",
           "type": "phase5_sentences",
-          "sentences": ["We can revise the design if needed."]
+          "sentences": [
+            "We can revise the design if needed."
+          ]
         }
       ]
     },

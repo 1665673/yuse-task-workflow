@@ -10,6 +10,8 @@ import type {
   Phase6RoleplayStep,
 } from "./types";
 
+export type ItemType = "word" | "phrase" | "sentence";
+
 export interface QuestionItem {
   kind: "question";
   phaseIndex: number;
@@ -18,6 +20,10 @@ export interface QuestionItem {
   question: Question;
   step: Step;
   phase: Phase;
+  /** When step has hierarchy (e.g. multiple words each with rounds) */
+  itemType?: ItemType;
+  itemIndex?: number; // 1-based
+  itemCount?: number;
 }
 
 export interface Phase4SubtaskItem {
@@ -71,6 +77,48 @@ export type FlowItem =
 export interface PhaseGuidanceItem {
   phaseIndex: number;
   phase: Phase;
+}
+
+/**
+ * Navigation label: <step_type_name> / <item #> / <question #>
+ * Omit the item level when there's only one item in that step.
+ */
+export function getFlowItemNavLabel(item: FlowItem): string {
+  const stepType = item.step.type;
+  switch (item.kind) {
+    case "phase4_subtask": {
+      const st = item.step as Phase4SubtasksStep;
+      const count = st.subtasks?.length ?? 0;
+      if (count <= 1) return `${stepType} / -`;
+      return `${stepType} / subtask ${item.subtaskIndex + 1} / -`;
+    }
+    case "phase5_sentence": {
+      const st = item.step as Phase5SentencesStep;
+      const count = st.sentences?.length ?? 0;
+      if (count <= 1) return `${stepType} / -`;
+      return `${stepType} / sentence ${item.sentenceIndex + 1} / -`;
+    }
+    case "phase5_phrase_cloze": {
+      const st = item.step as Phase5PhrasesStep;
+      const phraseIds = Object.keys(st.phraseClozes ?? {});
+      const roundLabel = `round ${item.roundIndex + 1}`;
+      if (phraseIds.length <= 1) return `${stepType} / ${roundLabel}`;
+      return `${stepType} / phrase ${item.phraseId} / ${roundLabel}`;
+    }
+    case "phase6_roleplay":
+      return `${stepType} / roleplay 1 / -`;
+    case "question": {
+      const q = item;
+      const questionNum = `question ${q.questionIndex + 1}`;
+      if (q.itemCount != null && q.itemCount > 1 && q.itemType && q.itemIndex != null) {
+        const label = `${q.itemType} ${q.itemIndex}`;
+        return `${stepType} / ${label} / ${questionNum}`;
+      }
+      return `${stepType} / ${questionNum}`;
+    }
+    default:
+      return stepType;
+  }
 }
 
 function getQuestionsFromStep(step: Step): Question[] {
@@ -173,16 +221,23 @@ export function flattenTaskFlow(task: TaskPackage): {
           });
         });
         if (Object.keys(phraseClozes).length === 0) {
-          const questions = getQuestionsFromStep(step);
-          questions.forEach((question, questionIndex) => {
-            flowItems.push({
-              kind: "question",
-              phaseIndex,
-              stepIndex,
-              questionIndex,
-              question,
-              step,
-              phase,
+          const phraseQuestions = (step as Phase5PhrasesStep).phraseQuestions ?? {};
+          const entries = Object.entries(phraseQuestions);
+          const totalPhrases = entries.length;
+          entries.forEach(([, questions], phraseIndex) => {
+            (questions ?? []).forEach((question, questionIndex) => {
+              flowItems.push({
+                kind: "question",
+                phaseIndex,
+                stepIndex,
+                questionIndex,
+                question,
+                step,
+                phase,
+                itemType: totalPhrases > 1 ? "phrase" : undefined,
+                itemIndex: totalPhrases > 1 ? phraseIndex + 1 : undefined,
+                itemCount: totalPhrases > 1 ? totalPhrases : undefined,
+              });
             });
           });
         }
@@ -203,6 +258,97 @@ export function flattenTaskFlow(task: TaskPackage): {
         return;
       }
 
+      // Steps with hierarchy: word/phrase/sentence -> multiple questions per item
+      if (step.type === "phase3_words") {
+        const wordQuestions = (step as import("./types").Phase3WordsStep).wordQuestions ?? {};
+        const entries = Object.entries(wordQuestions);
+        const total = entries.length;
+        entries.forEach(([, questions], wordIndex) => {
+          (questions ?? []).forEach((question, questionIndex) => {
+            flowItems.push({
+              kind: "question",
+              phaseIndex,
+              stepIndex,
+              questionIndex,
+              question,
+              step,
+              phase,
+              itemType: total > 1 ? "word" : undefined,
+              itemIndex: total > 1 ? wordIndex + 1 : undefined,
+              itemCount: total > 1 ? total : undefined,
+            });
+          });
+        });
+        return;
+      }
+      if (step.type === "phase3_phrases") {
+        const phraseQuestions = (step as import("./types").Phase3PhrasesStep).phraseQuestions ?? {};
+        const entries = Object.entries(phraseQuestions);
+        const total = entries.length;
+        entries.forEach(([, questions], phraseIndex) => {
+          (questions ?? []).forEach((question, questionIndex) => {
+            flowItems.push({
+              kind: "question",
+              phaseIndex,
+              stepIndex,
+              questionIndex,
+              question,
+              step,
+              phase,
+              itemType: total > 1 ? "phrase" : undefined,
+              itemIndex: total > 1 ? phraseIndex + 1 : undefined,
+              itemCount: total > 1 ? total : undefined,
+            });
+          });
+        });
+        return;
+      }
+      if (step.type === "phase3_sentences") {
+        const sentenceQuestions = (step as import("./types").Phase3SentencesStep).sentenceQuestions ?? {};
+        const entries = Object.entries(sentenceQuestions);
+        const total = entries.length;
+        entries.forEach(([, questions], sentenceIndex) => {
+          (questions ?? []).forEach((question, questionIndex) => {
+            flowItems.push({
+              kind: "question",
+              phaseIndex,
+              stepIndex,
+              questionIndex,
+              question,
+              step,
+              phase,
+              itemType: total > 1 ? "sentence" : undefined,
+              itemIndex: total > 1 ? sentenceIndex + 1 : undefined,
+              itemCount: total > 1 ? total : undefined,
+            });
+          });
+        });
+        return;
+      }
+      if (step.type === "phase5_words") {
+        const wordQuestions = (step as import("./types").Phase5WordsStep).wordQuestions ?? {};
+        const entries = Object.entries(wordQuestions);
+        const total = entries.length;
+        entries.forEach(([, questions], wordIndex) => {
+          (questions ?? []).forEach((question, questionIndex) => {
+            flowItems.push({
+              kind: "question",
+              phaseIndex,
+              stepIndex,
+              questionIndex,
+              question,
+              step,
+              phase,
+              itemType: total > 1 ? "word" : undefined,
+              itemIndex: total > 1 ? wordIndex + 1 : undefined,
+              itemCount: total > 1 ? total : undefined,
+            });
+          });
+        });
+        return;
+      }
+
+      // Steps with no hierarchy: flat list of questions (phase1_task_entry, phase2_warmup)
       const questions = getQuestionsFromStep(step);
       questions.forEach((question, questionIndex) => {
         flowItems.push({

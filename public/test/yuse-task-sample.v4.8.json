@@ -846,6 +846,59 @@
                   0
                 ]
               }
+            ],
+            "w2": [
+              {
+                "type": "text_image",
+                "stem": {
+                  "text": "customize"
+                },
+                "options": [
+                  {
+                    "imageAssetId": "img_194779cf40"
+                  },
+                  {
+                    "imageAssetId": "img_b8aea7a0f4"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  0
+                ]
+              },
+              {
+                "type": "text_image",
+                "stem": {
+                  "text": "customize"
+                },
+                "options": [
+                  {
+                    "imageAssetId": "img_194779cf40"
+                  },
+                  {
+                    "imageAssetId": "img_b8aea7a0f4"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  0
+                ]
+              },
+              {
+                "type": "text_image",
+                "stem": {
+                  "text": "customize"
+                },
+                "options": [
+                  {
+                    "imageAssetId": "img_194779cf40"
+                  },
+                  {
+                    "imageAssetId": "img_b8aea7a0f4"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  1
+                ]
+              }
             ]
           }
         },

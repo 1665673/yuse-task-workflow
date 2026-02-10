@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import type { TaskPackage } from "@/lib/types";
 import {
   flattenTaskFlow,
+  getFlowItemNavLabel,
   type FlowItem,
   type PhaseGuidanceItem,
 } from "@/lib/task-utils";
@@ -187,12 +188,11 @@ export default function TaskDemoPage() {
           )}
 
           <div className="mb-4 min-h-0 flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
+            <p className="mb-4 text-sm text-slate-500">
+              {getFlowItemNavLabel(item)}
+            </p>
             {item.kind === "question" && (
               <>
-                <p className="mb-4 text-sm text-slate-500">
-                  Phase {phaseIndex + 1} / Step {stepIndex + 1} / Question{" "}
-                  {item.questionIndex + 1}
-                </p>
                 <QuestionRenderer
                   key={`flow-${flowIndex}`}
                   question={item.question}
