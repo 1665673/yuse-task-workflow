@@ -1,0 +1,1182 @@
+{
+  "version": "4.8",
+  "id": "task-logo-customization-required-assets-001",
+  "title": "Logo Customization – Prompt-only Assets",
+  "description": "",
+  "taskModelLanguage": "en",
+  "nativeLanguage": "zh-CN",
+  "taskModel": {
+    "physicalScene": "Yiwu trading office discussing custom logo printing on packaging.",
+    "industry": "Yiwu Foreign Trade",
+    "roles": [
+      {
+        "id": "user",
+        "title": "Business Owner",
+        "description": null
+      },
+      {
+        "id": "client",
+        "title": "Middle East Buyer",
+        "description": null
+      }
+    ],
+    "tlts": {
+      "words": {
+        "w1": "logo",
+        "w2": "customize",
+        "w3": "color",
+        "w4": "format",
+        "w5": "quantity",
+        "w6": "price",
+        "w7": "timeline",
+        "w8": "confirm"
+      },
+      "phrases": {
+        "p1": "customize the logo",
+        "p2": "brand identity",
+        "p3": "target market",
+        "p4": "color preference",
+        "p5": "modern and simple",
+        "p6": "final version"
+      },
+      "sentences": {
+        "s1": "What kind of logo are you looking for?",
+        "s2": "Is this logo for online or offline use?",
+        "s3": "Do you have any color preferences?",
+        "s4": "We can customize the logo based on your brand.",
+        "s5": "This style works well for your market.",
+        "s6": "We can revise it if needed."
+      }
+    },
+    "behavioralChain": [
+      "Greeting",
+      "Clarify specs",
+      "Confirm quantity",
+      "Confirm timeline",
+      "Close"
+    ],
+    "subtasks": [
+      {
+        "id": "st1",
+        "title": "Clarify logo specs",
+        "goal": "Clarify logo specs",
+        "description": "Color, placement, file format"
+      },
+      {
+        "id": "st2",
+        "title": "Discuss quantity and price",
+        "goal": "Discuss quantity and price",
+        "description": "MOQ, unit price, quote"
+      },
+      {
+        "id": "st3",
+        "title": "Confirm timeline and close",
+        "goal": "Confirm timeline and close",
+        "description": "Delivery date, next steps"
+      }
+    ],
+    "dialogues": [
+      {
+        "id": "dlg_st1",
+        "scope": "subtask",
+        "subtaskId": "st1",
+        "turns": [
+          {
+            "role": "client",
+            "text": "Hi, I want to customize the logo on the box.",
+            "audioAssetId": "aud_5f4834910f"
+          },
+          {
+            "role": "user",
+            "text": "Sure. What color would you like for the logo?",
+            "audioAssetId": "aud_1bb8e72538"
+          },
+          {
+            "role": "client",
+            "text": "Black and gold, please.",
+            "audioAssetId": "aud_19ef5e2b1b"
+          },
+          {
+            "role": "user",
+            "text": "Great. Where should we place the logo?",
+            "audioAssetId": "aud_522f064714"
+          }
+        ]
+      },
+      {
+        "id": "dlg_st2",
+        "scope": "subtask",
+        "subtaskId": "st2",
+        "turns": [
+          {
+            "role": "client",
+            "text": "We need 5,000 pieces.",
+            "audioAssetId": "aud_9d43b8e281"
+          },
+          {
+            "role": "user",
+            "text": "Okay. The price depends on the quantity and printing method.",
+            "audioAssetId": "aud_994a6e2662"
+          },
+          {
+            "role": "client",
+            "text": "How much is it per piece?",
+            "audioAssetId": "aud_f3221b8940"
+          },
+          {
+            "role": "user",
+            "text": "Let me confirm the details, then I will send you a quote.",
+            "audioAssetId": "aud_c41c8f06a6"
+          }
+        ]
+      },
+      {
+        "id": "dlg_st3",
+        "scope": "subtask",
+        "subtaskId": "st3",
+        "turns": [
+          {
+            "role": "client",
+            "text": "Can you finish it before next Friday?",
+            "audioAssetId": "aud_61e877d14c"
+          },
+          {
+            "role": "user",
+            "text": "Yes, the timeline works if we confirm the design today.",
+            "audioAssetId": "aud_33a0ca34c3"
+          },
+          {
+            "role": "client",
+            "text": "Okay, please send the final mockup.",
+            "audioAssetId": "aud_61fb00fe0e"
+          },
+          {
+            "role": "user",
+            "text": "Sure. We can make a sample first, then start mass production.",
+            "audioAssetId": "aud_44b45506eb"
+          }
+        ]
+      },
+      {
+        "id": "dlg_full_a",
+        "scope": "full_task",
+        "difficulty": "a",
+        "turns": [
+          {
+            "role": "client",
+            "text": "I would like to customize a logo.",
+            "audioAssetId": "aud_a4bd7119ab"
+          },
+          {
+            "role": "user",
+            "text": "What kind of logo are you looking for?",
+            "audioAssetId": "aud_060f8959a3"
+          },
+          {
+            "role": "client",
+            "text": "I want something simple.",
+            "audioAssetId": "aud_19ef5e2b1b"
+          },
+          {
+            "role": "user",
+            "text": "Do you have any color preferences?",
+            "audioAssetId": "aud_060f8959a3"
+          },
+          {
+            "role": "client",
+            "text": "Blue is my preferred color.",
+            "audioAssetId": "aud_fb887c762e"
+          },
+          {
+            "role": "user",
+            "text": "Sure. Do you want to see a sample first?",
+            "audioAssetId": "aud_060f8959a3"
+          },
+          {
+            "role": "client",
+            "text": "Of course, thank you!",
+            "audioAssetId": "aud_ff1a118e60"
+          },
+          {
+            "role": "user",
+            "text": "You are welcome. Once confirmed, we can reach an agreement.",
+            "audioAssetId": "aud_060f8959a3"
+          },
+          {
+            "role": "client",
+            "text": "No problem.",
+            "audioAssetId": "aud_9d43b8e281"
+          }
+        ]
+      },
+      {
+        "id": "dlg_full_b",
+        "scope": "full_task",
+        "difficulty": "b",
+        "turns": [
+          {
+            "role": "client",
+            "text": "Hi, I want to customize the logo.",
+            "audioAssetId": "aud_a4bd7119ab"
+          },
+          {
+            "role": "user",
+            "text": "Understood. Let me confirm the details and send a quote.",
+            "audioAssetId": "aud_dbd49c018f"
+          },
+          {
+            "role": "client",
+            "text": "Black and gold, please.",
+            "audioAssetId": "aud_19ef5e2b1b"
+          },
+          {
+            "role": "user",
+            "text": "Understood. Let me confirm the details and send a quote.",
+            "audioAssetId": "aud_dbd49c018f"
+          },
+          {
+            "role": "client",
+            "text": "Put it on the front.",
+            "audioAssetId": "aud_fb887c762e"
+          },
+          {
+            "role": "user",
+            "text": "Understood. Let me confirm the details and send a quote.",
+            "audioAssetId": "aud_dbd49c018f"
+          },
+          {
+            "role": "client",
+            "text": "I can send a PDF file.",
+            "audioAssetId": "aud_ff1a118e60"
+          },
+          {
+            "role": "user",
+            "text": "Understood. Let me confirm the details and send a quote.",
+            "audioAssetId": "aud_dbd49c018f"
+          },
+          {
+            "role": "client",
+            "text": "We need 5,000 pieces.",
+            "audioAssetId": "aud_9d43b8e281"
+          },
+          {
+            "role": "user",
+            "text": "Understood. Let me confirm the details and send a quote.",
+            "audioAssetId": "aud_dbd49c018f"
+          },
+          {
+            "role": "client",
+            "text": "What is the unit price?",
+            "audioAssetId": "aud_13c136e471"
+          },
+          {
+            "role": "user",
+            "text": "Understood. Let me confirm the details and send a quote.",
+            "audioAssetId": "aud_dbd49c018f"
+          },
+          {
+            "role": "client",
+            "text": "Can you deliver before next Friday?",
+            "audioAssetId": "aud_a4e1382142"
+          },
+          {
+            "role": "user",
+            "text": "Understood. Let me confirm the details and send a quote.",
+            "audioAssetId": "aud_dbd49c018f"
+          },
+          {
+            "role": "client",
+            "text": "Please make a sample first.",
+            "audioAssetId": "aud_dfce1e2e66"
+          },
+          {
+            "role": "user",
+            "text": "Understood. Let me confirm the details and send a quote.",
+            "audioAssetId": "aud_dbd49c018f"
+          },
+          {
+            "role": "client",
+            "text": "Let’s confirm today.",
+            "audioAssetId": "aud_a6b7b522ff"
+          },
+          {
+            "role": "user",
+            "text": "Understood. Let me confirm the details and send a quote.",
+            "audioAssetId": "aud_dbd49c018f"
+          },
+          {
+            "role": "client",
+            "text": "Thank you.",
+            "audioAssetId": "aud_900e639f4e"
+          },
+          {
+            "role": "user",
+            "text": "Understood. Let me confirm the details and send a quote.",
+            "audioAssetId": "aud_dbd49c018f"
+          }
+        ]
+      },
+      {
+        "id": "dlg_full_c",
+        "scope": "full_task",
+        "difficulty": "c",
+        "turns": [
+          {
+            "role": "client",
+            "text": "Hi, I want to customize the logo.",
+            "audioAssetId": "aud_a4bd7119ab"
+          },
+          {
+            "role": "user",
+            "text": "Absolutely. I will confirm the specs and share the final quote.",
+            "audioAssetId": "aud_2b599434af"
+          },
+          {
+            "role": "client",
+            "text": "Black and gold, please.",
+            "audioAssetId": "aud_19ef5e2b1b"
+          },
+          {
+            "role": "user",
+            "text": "Absolutely. I will confirm the specs and share the final quote.",
+            "audioAssetId": "aud_2b599434af"
+          },
+          {
+            "role": "client",
+            "text": "Put it on the front.",
+            "audioAssetId": "aud_fb887c762e"
+          },
+          {
+            "role": "user",
+            "text": "Absolutely. I will confirm the specs and share the final quote.",
+            "audioAssetId": "aud_2b599434af"
+          },
+          {
+            "role": "client",
+            "text": "I can send a PDF file.",
+            "audioAssetId": "aud_ff1a118e60"
+          },
+          {
+            "role": "user",
+            "text": "Absolutely. I will confirm the specs and share the final quote.",
+            "audioAssetId": "aud_2b599434af"
+          },
+          {
+            "role": "client",
+            "text": "We need 5,000 pieces.",
+            "audioAssetId": "aud_9d43b8e281"
+          },
+          {
+            "role": "user",
+            "text": "Absolutely. I will confirm the specs and share the final quote.",
+            "audioAssetId": "aud_2b599434af"
+          },
+          {
+            "role": "client",
+            "text": "What is the unit price?",
+            "audioAssetId": "aud_13c136e471"
+          },
+          {
+            "role": "user",
+            "text": "Absolutely. I will confirm the specs and share the final quote.",
+            "audioAssetId": "aud_2b599434af"
+          },
+          {
+            "role": "client",
+            "text": "Can you deliver before next Friday?",
+            "audioAssetId": "aud_a4e1382142"
+          },
+          {
+            "role": "user",
+            "text": "Absolutely. I will confirm the specs and share the final quote.",
+            "audioAssetId": "aud_2b599434af"
+          },
+          {
+            "role": "client",
+            "text": "Please make a sample first.",
+            "audioAssetId": "aud_dfce1e2e66"
+          },
+          {
+            "role": "user",
+            "text": "Absolutely. I will confirm the specs and share the final quote.",
+            "audioAssetId": "aud_2b599434af"
+          },
+          {
+            "role": "client",
+            "text": "Let’s confirm today.",
+            "audioAssetId": "aud_a6b7b522ff"
+          },
+          {
+            "role": "user",
+            "text": "Absolutely. I will confirm the specs and share the final quote.",
+            "audioAssetId": "aud_2b599434af"
+          },
+          {
+            "role": "client",
+            "text": "Thank you.",
+            "audioAssetId": "aud_900e639f4e"
+          },
+          {
+            "role": "user",
+            "text": "Absolutely. I will confirm the specs and share the final quote.",
+            "audioAssetId": "aud_2b599434af"
+          }
+        ]
+      },
+      {
+        "id": "dlg_transfer_v1_a",
+        "scope": "full_task",
+        "difficulty": "a",
+        "turns": [
+          {
+            "role": "client",
+            "text": "Hi, I want to customize the logo.",
+            "audioAssetId": "aud_a4bd7119ab"
+          },
+          {
+            "role": "user",
+            "text": "Sure. Let me confirm the details.",
+            "audioAssetId": "aud_060f8959a3"
+          },
+          {
+            "role": "client",
+            "text": "Black and gold, please.",
+            "audioAssetId": "aud_19ef5e2b1b"
+          },
+          {
+            "role": "user",
+            "text": "Sure. Let me confirm the details.",
+            "audioAssetId": "aud_060f8959a3"
+          },
+          {
+            "role": "client",
+            "text": "Put it on the front.",
+            "audioAssetId": "aud_fb887c762e"
+          },
+          {
+            "role": "user",
+            "text": "Sure. Let me confirm the details.",
+            "audioAssetId": "aud_060f8959a3"
+          },
+          {
+            "role": "client",
+            "text": "I can send a PDF file.",
+            "audioAssetId": "aud_ff1a118e60"
+          },
+          {
+            "role": "user",
+            "text": "Sure. Let me confirm the details.",
+            "audioAssetId": "aud_060f8959a3"
+          },
+          {
+            "role": "client",
+            "text": "We need 5,000 pieces.",
+            "audioAssetId": "aud_9d43b8e281"
+          },
+          {
+            "role": "user",
+            "text": "Sure. Let me confirm the details.",
+            "audioAssetId": "aud_060f8959a3"
+          },
+          {
+            "role": "client",
+            "text": "What is the unit price?",
+            "audioAssetId": "aud_13c136e471"
+          },
+          {
+            "role": "user",
+            "text": "Sure. Let me confirm the details.",
+            "audioAssetId": "aud_060f8959a3"
+          },
+          {
+            "role": "client",
+            "text": "Can you deliver before next Friday?",
+            "audioAssetId": "aud_a4e1382142"
+          },
+          {
+            "role": "user",
+            "text": "Sure. Let me confirm the details.",
+            "audioAssetId": "aud_060f8959a3"
+          },
+          {
+            "role": "client",
+            "text": "Please make a sample first.",
+            "audioAssetId": "aud_dfce1e2e66"
+          },
+          {
+            "role": "user",
+            "text": "Sure. Let me confirm the details.",
+            "audioAssetId": "aud_060f8959a3"
+          },
+          {
+            "role": "client",
+            "text": "Let’s confirm today.",
+            "audioAssetId": "aud_a6b7b522ff"
+          },
+          {
+            "role": "user",
+            "text": "Sure. Let me confirm the details.",
+            "audioAssetId": "aud_060f8959a3"
+          },
+          {
+            "role": "client",
+            "text": "Thank you.",
+            "audioAssetId": "aud_900e639f4e"
+          },
+          {
+            "role": "user",
+            "text": "Sure. Let me confirm the details.",
+            "audioAssetId": "aud_060f8959a3"
+          }
+        ]
+      }
+    ],
+    "assets": {
+      "images": {
+        "img_194779cf40": {
+          "prompt": "A product box with a brand logo on the front, clean studio photo."
+        },
+        "img_c33d070619": {
+          "prompt": "Packaging mockup showing a centered logo."
+        },
+        "img_ef30d96157": {
+          "prompt": "Close-up of printed logo on cardboard box."
+        },
+        "img_12ac90f5c3": {
+          "prompt": "A price tag label close-up."
+        },
+        "img_eeedf49292": {
+          "prompt": "A discount sticker on a product."
+        },
+        "img_33e8a3d7ab": {
+          "prompt": "A price list sheet on a desk."
+        },
+        "img_0a7847702e": {
+          "prompt": "Company logo printed on packaging."
+        },
+        "img_02afceeab7": {
+          "prompt": "Brand mark on a box corner."
+        },
+        "img_cbb1fb610a": {
+          "prompt": "Logo design on a carton."
+        },
+        "img_4c91748651": {
+          "prompt": "A sample product on a table."
+        },
+        "img_f0dc8e9d3c": {
+          "prompt": "Prototype item with note 'sample'."
+        },
+        "img_ca7cbe5772": {
+          "prompt": "Small batch sample boxes stacked."
+        },
+        "img_cc1d0f04ec": {
+          "prompt": "A minimal logo on a box."
+        },
+        "img_b8aea7a0f4": {
+          "prompt": "Brand logo on packaging front."
+        },
+        "img_e46fe679c7": {
+          "prompt": "Printed logo close-up."
+        },
+        "img_85ece8be07": {
+          "prompt": "A wood log on grass."
+        },
+        "img_6076fa7749": {
+          "prompt": "Stacked firewood logs."
+        },
+        "img_6fe1bf0e4d": {
+          "prompt": "Cut tree trunk log."
+        }
+      },
+      "audios": {
+        "aud_5f4834910f": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Hi, I want to customize the logo on the box.'"
+        },
+        "aud_1bb8e72538": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Sure. What color would you like for the logo?'"
+        },
+        "aud_19ef5e2b1b": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Black and gold, please.'"
+        },
+        "aud_522f064714": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Great. Where should we place the logo?'"
+        },
+        "aud_9d43b8e281": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'We need 5,000 pieces.'"
+        },
+        "aud_994a6e2662": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Okay. The price depends on the quantity and printing method.'"
+        },
+        "aud_f3221b8940": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'How much is it per piece?'"
+        },
+        "aud_c41c8f06a6": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Let me confirm the details, then I will send you a quote.'"
+        },
+        "aud_61e877d14c": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Can you finish it before next Friday?'"
+        },
+        "aud_33a0ca34c3": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Yes, the timeline works if we confirm the design today.'"
+        },
+        "aud_61fb00fe0e": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Okay, please send the final mockup.'"
+        },
+        "aud_44b45506eb": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Sure. We can make a sample first, then start mass production.'"
+        },
+        "aud_a4bd7119ab": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Hi, I want to customize the logo.'"
+        },
+        "aud_060f8959a3": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Sure. Let me confirm the details.'"
+        },
+        "aud_fb887c762e": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Put it on the front.'"
+        },
+        "aud_ff1a118e60": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'I can send a PDF file.'"
+        },
+        "aud_13c136e471": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'What is the unit price?'"
+        },
+        "aud_a4e1382142": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Can you deliver before next Friday?'"
+        },
+        "aud_dfce1e2e66": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Please make a sample first.'"
+        },
+        "aud_a6b7b522ff": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Let’s confirm today.'"
+        },
+        "aud_900e639f4e": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Thank you.'"
+        },
+        "aud_dbd49c018f": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Understood. Let me confirm the details and send a quote.'"
+        },
+        "aud_2b599434af": {
+          "prompt": "TTS voice: neutral, US English. Speak: 'Absolutely. I will confirm the specs and share the final quote.'"
+        },
+        "aud_157c2d52e6": {
+          "prompt": "朗读单词：logo（清晰自然语速）"
+        },
+        "aud_9b4af96f71": {
+          "prompt": "朗读单词：customize（清晰自然语速）"
+        }
+      }
+    },
+    "completionCriteria": {
+      "passScore": 80,
+      "dimensions": [
+        "LANGUAGE_ACCURACY",
+        "INTERACTIONAL_FLUENCY",
+        "SPEECH_COMPREHENSIBILITY",
+        "TASK_GOAL_ACHIEVEMENT",
+        "CULTURAL_PROFESSIONAL_APPROPRIATENESS"
+      ]
+    },
+    "cultureModel": "polite tone | clear confirmation | confirm before quoting | taboos:sarcasm",
+    "feedbackPrinciples": [
+      "mode=IMPLICIT_ONLY",
+      "strategies=RECAST,CLARIFICATION"
+    ]
+  },
+  "phases": [
+    {
+      "type": "phase1",
+      "steps": [
+        {
+          "id": "phase1_entry",
+          "type": "phase1_task_entry",
+          "callToActionText": "我明白了，开始学习",
+          "guidance": {
+            "purpose": "介绍任务背景",
+            "description": "你将扮演义乌外贸商家，与海外买家沟通定制Logo。\n你需要澄清细节、报价并确认交付时间。\n完成后会有评分与改进建议。"
+          },
+          "entryQuestions": [
+            {
+              "type": "text_text",
+              "stem": {
+                "text": "你的任务"
+              },
+              "options": [
+                {
+                  "text": "明确客户的需求"
+                },
+                {
+                  "text": "讨论标志风格和颜色"
+                },
+                {
+                  "text": "专业地处理修订"
+                },
+                {
+                  "text": "就交货达成明确协议"
+                }
+              ],
+              "correctOptionIndexes": [
+                1
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "phase2",
+      "steps": [
+        {
+          "id": "phase2_warmup",
+          "type": "phase2_warmup",
+          "warmupQuestions": [
+            {
+              "type": "text_text",
+              "stem": {
+                "text": "Which question best asks for the logo file?"
+              },
+              "options": [
+                {
+                  "text": "Could you share the logo file?"
+                },
+                {
+                  "text": "Do you want a refund?"
+                }
+              ],
+              "correctOptionIndexes": [
+                0
+              ],
+              "hint": "Ask for the file before discussing printing."
+            },
+            {
+              "type": "text_text",
+              "stem": {
+                "text": "What should you avoid with Middle East clients?"
+              },
+              "options": [
+                {
+                  "text": "Rushing decisions"
+                },
+                {
+                  "text": "Confirming details carefully"
+                }
+              ],
+              "correctOptionIndexes": [
+                1
+              ],
+              "hint": "Confirming details prevents mistakes."
+            },
+            {
+              "type": "text_text",
+              "stem": {
+                "text": "What matters most in logo discussion?"
+              },
+              "options": [
+                {
+                  "text": "Cultural meaning of colors"
+                },
+                {
+                  "text": "Only low price"
+                }
+              ],
+              "correctOptionIndexes": [
+                0
+              ],
+              "hint": "Cultural meaning is crucial for Middle East clients."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "phase3",
+      "steps": [
+        {
+          "id": "phase3_words",
+          "type": "phase3_words",
+          "wordQuestions": {
+            "w1": [
+              {
+                "type": "text_image",
+                "stem": {
+                  "text": "logo"
+                },
+                "options": [
+                  {
+                    "imageAssetId": "img_194779cf40"
+                  },
+                  {
+                    "imageAssetId": "img_c33d070619"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  1
+                ]
+              },
+              {
+                "type": "text_image",
+                "stem": {
+                  "text": "logo"
+                },
+                "options": [
+                  {
+                    "imageAssetId": "img_0a7847702e"
+                  },
+                  {
+                    "imageAssetId": "img_02afceeab7"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  0
+                ]
+              },
+              {
+                "type": "text_image",
+                "stem": {
+                  "text": "logo"
+                },
+                "options": [
+                  {
+                    "imageAssetId": "img_cc1d0f04ec"
+                  },
+                  {
+                    "imageAssetId": "img_b8aea7a0f4"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  0
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "phase3_phrases",
+          "type": "phase3_phrases",
+          "phraseQuestions": {
+            "p2": [
+              {
+                "type": "text_cloze",
+                "stem": {
+                  "text": "What ____ would you like?"
+                },
+                "options": [
+                  {
+                    "text": "color"
+                  },
+                  {
+                    "text": "price"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  0
+                ]
+              },
+              {
+                "type": "text_cloze",
+                "stem": {
+                  "text": "What ____ do you prefer?"
+                },
+                "options": [
+                  {
+                    "text": "color"
+                  },
+                  {
+                    "text": "quantity"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  0
+                ]
+              },
+              {
+                "type": "text_cloze",
+                "stem": {
+                  "text": "What ____ should we use for the logo?"
+                },
+                "options": [
+                  {
+                    "text": "color"
+                  },
+                  {
+                    "text": "timeline"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  0
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "phase3_sentences",
+          "type": "phase3_sentences",
+          "sentenceQuestions": {
+            "sentence_csl_s3": [
+              {
+                "type": "text_text",
+                "stem": {
+                  "text": "Is the design final?"
+                },
+                "options": [
+                  {
+                    "text": "We need 5,000 pieces."
+                  },
+                  {
+                    "text": "We can revise the design if needed."
+                  }
+                ],
+                "correctOptionIndexes": [
+                  1
+                ]
+              },
+              {
+                "type": "text_text",
+                "stem": {
+                  "text": "What's next?"
+                },
+                "options": [
+                  {
+                    "text": "We can revise the design if needed."
+                  },
+                  {
+                    "text": "Have a nice day."
+                  }
+                ],
+                "correctOptionIndexes": [
+                  0
+                ]
+              },
+              {
+                "type": "text_text",
+                "stem": {
+                  "text": "What about the design?"
+                },
+                "options": [
+                  {
+                    "text": "We can revise the design if needed."
+                  },
+                  {
+                    "text": "Please call me later."
+                  }
+                ],
+                "correctOptionIndexes": [
+                  0
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "subtask_learning",
+      "steps": [
+        {
+          "id": "phase4_subtasks",
+          "type": "phase4_subtasks",
+          "subtasks": [
+            {
+              "subtaskId": "st1",
+              "allowedRoles": [
+                "user"
+              ],
+              "dialogueId": "dlg_st1",
+              "dialogDistractors": [
+                {
+                  "index": 1,
+                  "options": [
+                    {
+                      "id": "opt2",
+                      "text": "Sure. What is the weather today?"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "subtaskId": "st2",
+              "allowedRoles": [
+                "user"
+              ],
+              "dialogueId": "dlg_st2",
+              "dialogDistractors": [
+                {
+                  "index": 1,
+                  "options": [
+                    {
+                      "id": "opt4",
+                      "text": "Okay. The logo is not important."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "subtaskId": "st3",
+              "allowedRoles": [
+                "user"
+              ],
+              "dialogueId": "dlg_st3",
+              "dialogDistractors": [
+                {
+                  "index": 1,
+                  "options": [
+                    {
+                      "id": "opt6",
+                      "text": "Yes, the timeline works if we never confirm anything."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "reinforcement",
+      "steps": [
+        {
+          "id": "phase5_words",
+          "type": "phase5_words",
+          "wordQuestions": {
+            "w1": [
+              {
+                "type": "audio_text",
+                "stem": {
+                  "audioAssetId": "aud_157c2d52e6"
+                },
+                "options": [
+                  {
+                    "text": "logo",
+                    "audioAssetId": "aud_157c2d52e6"
+                  },
+                  {
+                    "text": "customize",
+                    "audioAssetId": "aud_9b4af96f71"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  0
+                ]
+              },
+              {
+                "type": "audio_text",
+                "stem": {
+                  "audioAssetId": "aud_157c2d52e6"
+                },
+                "options": [
+                  {
+                    "text": "logo",
+                    "audioAssetId": "aud_157c2d52e6"
+                  },
+                  {
+                    "text": "customize",
+                    "audioAssetId": "aud_9b4af96f71"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  0
+                ]
+              },
+              {
+                "type": "audio_text",
+                "stem": {
+                  "audioAssetId": "aud_157c2d52e6"
+                },
+                "options": [
+                  {
+                    "text": "logo",
+                    "audioAssetId": "aud_157c2d52e6"
+                  },
+                  {
+                    "text": "customize",
+                    "audioAssetId": "aud_9b4af96f71"
+                  }
+                ],
+                "correctOptionIndexes": [
+                  0
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "phase5_phrases",
+          "type": "phase5_phrases",
+          "phraseClozes": {
+            "p1": {
+              "sentences": [
+                "We need to ___ the font style.",
+                "The final design should be ___.",
+                "Are we still able to ___ the style?"
+              ],
+              "answer": "adjust",
+              "textHint": "Start with letter a",
+              "audioHint": "aud_157c2d52e6"
+            }
+          }
+        },
+        {
+          "id": "phase5_sentences",
+          "type": "phase5_sentences",
+          "sentences": ["We can revise the design if needed."]
+        }
+      ]
+    },
+    {
+      "type": "roleplay",
+      "steps": [
+        {
+          "id": "phase6_roleplay",
+          "type": "phase6_roleplay",
+          "roleplays": [
+            {
+              "allowedRoles": [
+                "user"
+              ],
+              "dialogueId": "dlg_full_a",
+              "difficulty": "a",
+              "dialogHints": [
+                {
+                  "index": 1,
+                  "text": "Ask about what kind of logo."
+                },
+                {
+                  "index": 3,
+                  "text": "Ask about color preference."
+                },
+                {
+                  "index": 5,
+                  "text": "Ask about sample."
+                },
+                {
+                  "index": 7,
+                  "text": "Keyword: confirm, agreement."
+                }
+              ]
+            },
+            {
+              "allowedRoles": [
+                "user"
+              ],
+              "dialogueId": "dlg_full_b",
+              "difficulty": "b",
+              "dialogHints": []
+            },
+            {
+              "allowedRoles": [
+                "user"
+              ],
+              "dialogueId": "dlg_full_c",
+              "difficulty": "c",
+              "dialogHints": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "translations": {}
+}
