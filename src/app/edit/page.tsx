@@ -5,6 +5,7 @@ import type {
   Question,
   TaskPackage,
   Phase,
+  Step,
   Phase1EntryStep,
   Phase2WarmupStep,
   Phase3WordsStep,
@@ -761,8 +762,8 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
     const steps = [...phase.steps];
     const idx = steps.findIndex((s) => s.type === type);
     if (idx === -1) return;
-    const current = steps[idx] as T;
-    steps[idx] = updater(current);
+    const current = steps[idx] as unknown as T;
+    steps[idx] = updater(current) as unknown as Step;
     updatePhase({ ...phase, steps });
   };
 
@@ -787,8 +788,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                       type: "phase3_words",
                     } as unknown as Phase3WordsStep,
                   ],
-                  steps: [] as any,
-                } as any,
+                } as Phase,
               ],
             }}
             setTask={(nextTask) => {
