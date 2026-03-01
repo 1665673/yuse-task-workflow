@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import type { TaskPackage } from "@/lib/types";
+import type { TaskPackage, Phase } from "@/lib/types";
 import {
   flattenTaskFlow,
   getFlowItemNavLabel,
@@ -24,6 +24,7 @@ export default function TaskDemoPage() {
   const [phaseGuidancePhaseIndex, setPhaseGuidancePhaseIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [questionAnswered, setQuestionAnswered] = useState(false);
+  const [phaseJsonModalPhase, setPhaseJsonModalPhase] = useState<Phase | null>(null);
 
   const { phaseGuidanceItems, flowItems } = task
     ? flattenTaskFlow(task)
@@ -138,11 +139,26 @@ export default function TaskDemoPage() {
     if (!phase?.guidance) return null;
 
     return (
-      <main className="flex min-h-screen flex-col bg-slate-50 p-6">
+      <>
+        <main className="flex min-h-screen flex-col bg-slate-50 p-6">
         <div className="mx-auto flex max-w-2xl flex-1 flex-col">
-          <h2 className="mb-4 text-xl font-semibold text-slate-800">
-            Phase: {phase.type}
-          </h2>
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <h2 className="text-xl font-semibold text-slate-800">
+              Phase: {phase.type}
+            </h2>
+            <button
+              type="button"
+              onClick={() => setPhaseJsonModalPhase(phase)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+              title="View phase JSON"
+              aria-label="View phase JSON"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+              </svg>
+            </button>
+          </div>
           <GuidanceBlock guidance={phase.guidance} label="Phase guidance" />
           <div className="mt-8 flex justify-end">
             <button
@@ -155,6 +171,26 @@ export default function TaskDemoPage() {
           </div>
         </div>
       </main>
+      {phaseJsonModalPhase && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl border border-slate-200 bg-white shadow-lg">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <h3 className="text-sm font-semibold text-slate-800">Phase data (JSON)</h3>
+              <button
+                type="button"
+                onClick={() => setPhaseJsonModalPhase(null)}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              >
+                Close
+              </button>
+            </div>
+            <pre className="flex-1 overflow-auto p-4 text-xs text-slate-800">
+              {JSON.stringify(phaseJsonModalPhase, null, 2)}
+            </pre>
+          </div>
+        </div>
+      )}
+      </>
     );
   }
 
@@ -166,6 +202,7 @@ export default function TaskDemoPage() {
     const showQuestionGuidance = item.kind === "question" && item.question.guidance;
 
     return (
+      <>
       <main className="flex min-h-screen flex-col bg-slate-50 p-4 sm:p-6">
         <div className="mb-4 mx-auto flex w-full max-w-2xl flex-1 flex-col min-h-0">
           {showStepGuidance && (
@@ -187,9 +224,23 @@ export default function TaskDemoPage() {
           )}
 
 <div className="mb-4 max-h-[85vh] min-h-[50vh] overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
-            <p className="mb-4 text-sm text-slate-500">
-              {getFlowItemNavLabel(item)}
-            </p>
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <p className="text-sm text-slate-500">
+                {getFlowItemNavLabel(item)}
+              </p>
+              <button
+                type="button"
+                onClick={() => setPhaseJsonModalPhase(item.phase)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                title="View phase JSON"
+                aria-label="View phase JSON"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <polyline points="16 18 22 12 16 6" />
+                  <polyline points="8 6 2 12 8 18" />
+                </svg>
+              </button>
+            </div>
             {item.kind === "question" && (
               <>
                 <QuestionRenderer
@@ -248,6 +299,26 @@ export default function TaskDemoPage() {
           )}
         </div>
       </main>
+      {phaseJsonModalPhase && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl border border-slate-200 bg-white shadow-lg">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <h3 className="text-sm font-semibold text-slate-800">Phase data (JSON)</h3>
+              <button
+                type="button"
+                onClick={() => setPhaseJsonModalPhase(null)}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              >
+                Close
+              </button>
+            </div>
+            <pre className="flex-1 overflow-auto p-4 text-xs text-slate-800">
+              {JSON.stringify(phaseJsonModalPhase, null, 2)}
+            </pre>
+          </div>
+        </div>
+      )}
+      </>
     );
   }
 
@@ -264,9 +335,10 @@ export default function TaskDemoPage() {
           <button
             type="button"
             onClick={() => {
-              setScreen("welcome");
+              setScreen("loading");
               setTask(null);
               setFlowIndex(0);
+              fetchTask();
             }}
             className="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700"
           >
