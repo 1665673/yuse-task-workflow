@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { TaskPackage } from "@/lib/types";
 import {
   flattenTaskFlow,
@@ -15,11 +15,11 @@ import { Phase5SentenceView } from "@/components/Phase5SentenceView";
 import { Phase5PhraseClozeView } from "@/components/Phase5PhraseClozeView";
 import { Phase6RoleplayView } from "@/components/Phase6RoleplayView";
 
-type Screen = "welcome" | "loading" | "phase-guidance" | "question" | "complete";
+type Screen = "loading" | "phase-guidance" | "question" | "complete" | "error";
 
 export default function TaskDemoPage() {
   const [task, setTask] = useState<TaskPackage | null>(null);
-  const [screen, setScreen] = useState<Screen>("welcome");
+  const [screen, setScreen] = useState<Screen>("loading");
   const [flowIndex, setFlowIndex] = useState(0);
   const [phaseGuidancePhaseIndex, setPhaseGuidancePhaseIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +57,7 @@ export default function TaskDemoPage() {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
-      setScreen("welcome");
+      setScreen("error");
     }
   };
 
@@ -98,38 +98,37 @@ export default function TaskDemoPage() {
     }
   };
 
-  if (screen === "welcome") {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
-        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h1 className="mb-2 text-2xl font-semibold text-slate-800">
-            Language Learning Demo
-          </h1>
-          <p className="mb-6 text-slate-600">
-            Click below to start the task workflow. The task will be loaded from
-            the sample file.
-          </p>
-          {error && (
-            <p className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700">
-              {error}
-            </p>
-          )}
-          <button
-            type="button"
-            onClick={fetchTask}
-            className="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            Start Task
-          </button>
-        </div>
-      </main>
-    );
-  }
+  useEffect(() => {
+    fetchTask();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (screen === "loading") {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
         <div className="text-slate-600">Loading task...</div>
+      </main>
+    );
+  }
+
+  if (screen === "error") {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
+        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+          <h1 className="mb-2 text-2xl font-semibold text-slate-800">
+            Failed to load task
+          </h1>
+          <p className="mb-4 text-sm text-slate-600">
+            {error ?? "An unknown error occurred while loading the sample task."}
+          </p>
+          <button
+            type="button"
+            onClick={fetchTask}
+            className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
       </main>
     );
   }
