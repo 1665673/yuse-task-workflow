@@ -18,12 +18,12 @@ import { SpeakPracticeView } from "@/components/SpeakPracticeView";
 type Screen = "welcome" | "loading" | "phase-guidance" | "question" | "complete";
 
 const PHASE_NAMES = [
-  "Phase 1: Introduction",
-  "Phase 2: Vocabulary",
-  "Phase 3: Grammar",
-  "Phase 4: Reading",
-  "Phase 5: Practice",
-  "Phase 6: Roleplay",
+  "Phase 1",
+  "Phase 2",
+  "Phase 3",
+  "Phase 4",
+  "Phase 5",
+  "Phase 6",
 ];
 
 export default function TaskDemoPage() {
