@@ -17,6 +17,15 @@ import { SpeakPracticeView } from "@/components/SpeakPracticeView";
 
 type Screen = "welcome" | "loading" | "phase-guidance" | "question" | "complete";
 
+const PHASE_NAMES = [
+  "Phase 1: Introduction",
+  "Phase 2: Vocabulary",
+  "Phase 3: Grammar",
+  "Phase 4: Reading",
+  "Phase 5: Practice",
+  "Phase 6: Roleplay",
+];
+
 export default function TaskDemoPage() {
   const [task, setTask] = useState<TaskPackage | null>(null);
   const [screen, setScreen] = useState<Screen>("welcome");
@@ -24,6 +33,7 @@ export default function TaskDemoPage() {
   const [phaseGuidancePhaseIndex, setPhaseGuidancePhaseIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [questionAnswered, setQuestionAnswered] = useState(false);
+  const [showPhaseSelector, setShowPhaseSelector] = useState(false);
 
   const { phaseGuidanceItems, flowItems } = task
     ? flattenTaskFlow(task)
@@ -52,6 +62,39 @@ export default function TaskDemoPage() {
         setScreen("phase-guidance");
       } else {
         setFlowIndex(firstIdx >= 0 ? firstIdx : 0);
+        setQuestionAnswered(false);
+        setScreen("question");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+      setScreen("welcome");
+    }
+  };
+
+  const jumpToPhase = async (phaseIdx: number) => {
+    setShowPhaseSelector(false);
+    setScreen("loading");
+    setError(null);
+    try {
+      const res = await fetch("/api/task");
+      if (!res.ok) throw new Error("Failed to load task");
+      const data: TaskPackage = await res.json();
+      setTask(data);
+
+      const { flowItems: items } = flattenTaskFlow(data);
+      const firstIdx = items.findIndex((item) => item.phaseIndex === phaseIdx);
+
+      if (firstIdx === -1) {
+        setError(`Phase ${phaseIdx + 1} not found in task`);
+        setScreen("welcome");
+        return;
+      }
+
+      if (data.phases[phaseIdx]?.guidance) {
+        setPhaseGuidancePhaseIndex(phaseIdx);
+        setScreen("phase-guidance");
+      } else {
+        setFlowIndex(firstIdx);
         setQuestionAnswered(false);
         setScreen("question");
       }
@@ -114,14 +157,53 @@ export default function TaskDemoPage() {
               {error}
             </p>
           )}
-          <button
-            type="button"
-            onClick={fetchTask}
-            className="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            Start Task
-          </button>
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={fetchTask}
+              className="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700"
+            >
+              Start Task
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowPhaseSelector(true)}
+              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              Jump to Phase
+            </button>
+          </div>
         </div>
+
+        {/* Phase Selector Modal */}
+        {showPhaseSelector && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-lg">
+              <h2 className="mb-4 text-lg font-semibold text-slate-800">
+                Select a Phase
+              </h2>
+              <div className="flex flex-col gap-2">
+                {PHASE_NAMES.map((name, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => jumpToPhase(idx)}
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-left font-medium text-slate-700 transition-colors hover:border-blue-300 hover:bg-blue-50"
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPhaseSelector(false)}
+                className="mt-4 w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </main>
     );
   }
