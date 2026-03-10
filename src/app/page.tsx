@@ -13,6 +13,7 @@ import { Phase4SubtaskView } from "@/components/Phase4SubtaskView";
 import { Phase5SentenceView } from "@/components/Phase5SentenceView";
 import { Phase5PhraseClozeView } from "@/components/Phase5PhraseClozeView";
 import { Phase6RoleplayView } from "@/components/Phase6RoleplayView";
+import { SpeakPracticeView } from "@/components/SpeakPracticeView";
 
 type Screen = "welcome" | "loading" | "phase-guidance" | "question" | "complete";
 
@@ -231,6 +232,18 @@ export default function TaskDemoPage() {
                 task={task}
                 onContinue={handleFlowContinue}
               />
+            )}
+            {item.kind === "phase5_speak_practice" && (
+              <>
+                <p className="mb-4 text-sm text-slate-500">
+                  Phase {phaseIndex + 1} / Step {stepIndex + 1} / Speaking Practice
+                </p>
+                <SpeakPracticeView
+                  key={`flow-${flowIndex}`}
+                  textToSpeak={item.textToSpeak}
+                  onContinue={handleFlowContinue}
+                />
+              </>
             )}
           </div>
 

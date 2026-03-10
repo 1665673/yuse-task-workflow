@@ -61,12 +61,23 @@ export interface Phase6RoleplayItem {
   phase: Phase;
 }
 
+export interface Phase5SpeakPracticeItem {
+  kind: "phase5_speak_practice";
+  phaseIndex: number;
+  stepIndex: number;
+  textToSpeak: string;
+  sourceType: "word" | "sentence" | "phrase";
+  step: Step;
+  phase: Phase;
+}
+
 export type FlowItem =
   | QuestionItem
   | Phase4SubtaskItem
   | Phase5SentenceItem
   | Phase5PhraseClozeItem
-  | Phase6RoleplayItem;
+  | Phase6RoleplayItem
+  | Phase5SpeakPracticeItem;
 
 export interface PhaseGuidanceItem {
   phaseIndex: number;
@@ -137,6 +148,18 @@ export function flattenTaskFlow(task: TaskPackage): {
             step: st,
             phase,
           });
+          // Add speak practice after each sentence practice
+          if (sentence) {
+            flowItems.push({
+              kind: "phase5_speak_practice",
+              phaseIndex,
+              stepIndex,
+              textToSpeak: sentence,
+              sourceType: "sentence",
+              step: st,
+              phase,
+            });
+          }
         });
         if (sentences.length === 0) {
           flowItems.push({
@@ -200,6 +223,37 @@ export function flattenTaskFlow(task: TaskPackage): {
             phase,
           });
         }
+        return;
+      }
+
+      // Handle phase5_words specially to add speak practice after each question
+      if (step.type === "phase5_words") {
+        const wordQuestions = step.wordQuestions ?? {};
+        Object.entries(wordQuestions).forEach(([wordId, questions]) => {
+          // Get the word text from tlts
+          const wordText = task.taskModel.tlts.words[wordId] ?? wordId;
+          questions.forEach((question, questionIndex) => {
+            flowItems.push({
+              kind: "question",
+              phaseIndex,
+              stepIndex,
+              questionIndex,
+              question,
+              step,
+              phase,
+            });
+            // Add speak practice after each question for this word
+            flowItems.push({
+              kind: "phase5_speak_practice",
+              phaseIndex,
+              stepIndex,
+              textToSpeak: wordText,
+              sourceType: "word",
+              step,
+              phase,
+            });
+          });
+        });
         return;
       }
 
