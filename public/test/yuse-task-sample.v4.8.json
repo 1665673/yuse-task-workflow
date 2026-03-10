@@ -1040,22 +1040,30 @@
         {
           "id": "phase5_words",
           "type": "phase5_words",
-          "wordQuestions": {
-            "w1": [
-              {
-                "type": "audio_text",
-                "stem": {
-                  "audioAssetId": "aud_157c2d52e6"
-                },
-                "options": [
-                  {
-                    "text": "logo",
-                    "audioAssetId": "aud_157c2d52e6"
-                  },
-                  {
-                    "text": "customize",
-                    "audioAssetId": "aud_9b4af96f71"
-                  }
+"wordQuestions": {
+  "w1": [
+  {
+  "type": "audio_text",
+  "stem": {
+  "audioAssetId": "aud_157c2d52e6"
+  },
+  "options": [
+  {
+  "text": "logo",
+  "audioAssetId": "aud_157c2d52e6"
+  },
+  {
+  "text": "customize",
+  "audioAssetId": "aud_9b4af96f71"
+  }
+  ],
+  "correctOptionIndexes": [
+  0
+  ]
+  }
+  ]
+  }
+  }
                 ],
                 "correctOptionIndexes": [
                   0
