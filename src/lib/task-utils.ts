@@ -45,10 +45,23 @@ export interface Phase5PhraseClozeItem {
   stepIndex: number;
   phraseId: string;
   roundIndex: number;
+  totalRounds: number;
   sentence: string;
   answer: string;
   textHint?: string;
   audioHint?: string;
+  step: Phase5PhrasesStep;
+  phase: Phase;
+}
+
+export interface Phase5PhraseRecognitionItem {
+  kind: "phase5_phrase_recognition";
+  phaseIndex: number;
+  stepIndex: number;
+  phraseId: string;
+  phraseText: string;
+  phraseTranslation: string;
+  phraseDistractor: string;
   step: Phase5PhrasesStep;
   phase: Phase;
 }
@@ -76,6 +89,7 @@ export type FlowItem =
   | Phase4SubtaskItem
   | Phase5SentenceItem
   | Phase5PhraseClozeItem
+  | Phase5PhraseRecognitionItem
   | Phase6RoleplayItem
   | Phase5SpeakPracticeItem;
 
@@ -178,7 +192,23 @@ export function flattenTaskFlow(task: TaskPackage): {
         const st = step as Phase5PhrasesStep;
         const phraseClozes = st.phraseClozes ?? {};
         Object.entries(phraseClozes).forEach(([phraseId, entry]) => {
+          if (entry.phraseDistractor) {
+            const phraseText = task.taskModel.tlts.phrases[phraseId] ?? phraseId;
+            const phraseTranslation = task.translations[phraseId]?.native ?? "";
+            flowItems.push({
+              kind: "phase5_phrase_recognition",
+              phaseIndex,
+              stepIndex,
+              phraseId,
+              phraseText,
+              phraseTranslation,
+              phraseDistractor: entry.phraseDistractor,
+              step: st,
+              phase,
+            });
+          }
           const sentences = entry.sentences ?? [];
+          const totalRounds = sentences.length;
           sentences.forEach((sentence, roundIndex) => {
             flowItems.push({
               kind: "phase5_phrase_cloze",
@@ -186,6 +216,7 @@ export function flattenTaskFlow(task: TaskPackage): {
               stepIndex,
               phraseId,
               roundIndex,
+              totalRounds,
               sentence,
               answer: entry.answer ?? "",
               textHint: entry.textHint,

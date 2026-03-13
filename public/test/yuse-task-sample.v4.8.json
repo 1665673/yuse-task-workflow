@@ -693,32 +693,7 @@
           "guidance": {
             "purpose": "介绍任务背景",
             "description": "你将扮演义乌外贸商家，与海外买家沟通定制Logo。\n你需要澄清细节、报价并确认交付时间。\n完成后会有评分与改进建议。"
-          },
-          "entryQuestions": [
-            {
-              "type": "text_text",
-              "stem": {
-                "text": "你的任务"
-              },
-              "options": [
-                {
-                  "text": "明确客户的需求"
-                },
-                {
-                  "text": "讨论标志风格和颜色"
-                },
-                {
-                  "text": "专业地处理修订"
-                },
-                {
-                  "text": "就交货达成明确协议"
-                }
-              ],
-              "correctOptionIndexes": [
-                1
-              ]
-            }
-          ]
+          }
         }
       ]
     },
@@ -1067,6 +1042,7 @@
           "type": "phase5_phrases",
           "phraseClozes": {
             "p1": {
+              "phraseDistractor": "some distractor",
               "sentences": [
                 "We need to ___ the font style.",
                 "The final design should be ___.",

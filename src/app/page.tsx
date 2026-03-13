@@ -13,6 +13,7 @@ import { Phase4SubtaskView } from "@/components/Phase4SubtaskView";
 import { Phase5SentenceView } from "@/components/Phase5SentenceView";
 import { Phase5PhraseClozeView } from "@/components/Phase5PhraseClozeView";
 import { Phase6RoleplayView } from "@/components/Phase6RoleplayView";
+import { Phase5PhraseRecognitionView } from "@/components/Phase5PhraseRecognitionView";
 import { SpeakPracticeView } from "@/components/SpeakPracticeView";
 
 type Screen = "welcome" | "loading" | "phase-guidance" | "question" | "complete";
@@ -107,8 +108,23 @@ export default function TaskDemoPage() {
   const handlePhaseGuidanceContinue = () => {
     const phaseIdx = phaseGuidancePhaseIndex;
     const firstIdx = getFirstFlowIndexForPhase(phaseIdx);
-    setFlowIndex(firstIdx);
     setQuestionAnswered(false);
+    if (firstIdx === -1) {
+      // Phase has guidance but no flow items — skip to next phase
+      const nextPhaseIdx = phaseIdx + 1;
+      if (!task || nextPhaseIdx >= task.phases.length) {
+        setScreen("complete");
+      } else if (task.phases[nextPhaseIdx]?.guidance) {
+        setPhaseGuidancePhaseIndex(nextPhaseIdx);
+        // screen stays "phase-guidance"
+      } else {
+        const nextFirstIdx = getFirstFlowIndexForPhase(nextPhaseIdx);
+        setFlowIndex(nextFirstIdx >= 0 ? nextFirstIdx : 0);
+        setScreen("question");
+      }
+      return;
+    }
+    setFlowIndex(firstIdx);
     setScreen("question");
   };
 
@@ -303,7 +319,13 @@ export default function TaskDemoPage() {
               <Phase5PhraseClozeView
                 key={`flow-${flowIndex}`}
                 item={item}
-                task={task}
+                onContinue={handleFlowContinue}
+              />
+            )}
+            {item.kind === "phase5_phrase_recognition" && (
+              <Phase5PhraseRecognitionView
+                key={`flow-${flowIndex}`}
+                item={item}
                 onContinue={handleFlowContinue}
               />
             )}

@@ -124,7 +124,7 @@ export interface BaseStep {
 export interface Phase1EntryStep extends BaseStep {
   type: "phase1_task_entry";
   callToActionText: string;
-  entryQuestions: Question[];
+  entryQuestions?: Question[];
 }
 
 export interface Phase2WarmupStep extends BaseStep {
@@ -168,6 +168,7 @@ export interface Phase5WordsStep extends BaseStep {
 }
 
 export interface PhraseClozeEntry {
+  phraseDistractor?: string;
   sentences: string[];
   answer: string;
   textHint?: string;
