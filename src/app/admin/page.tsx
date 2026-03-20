@@ -15,17 +15,6 @@ interface AdminTaskRow {
 
 type AdminTab = "overview" | "tasks";
 
-const INITIAL_TASKS: AdminTaskRow[] = [
-  {
-    id: "task-logo-customization-required-assets-001",
-    title: "Logo Customization – Prompt-only Assets",
-    language: "English",
-    status: "pending_review",
-    // Hardcoded sample created date: 02/12/2026, 15:31:20
-    createdAt: new Date("2026-02-12T15:31:20").toISOString(),
-  },
-];
-
 export default function AdminPage() {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -34,7 +23,14 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
-  const [tasks, setTasks] = useState<AdminTaskRow[]>(INITIAL_TASKS);
+  const [tasks, setTasks] = useState<AdminTaskRow[]>([]);
+
+  useEffect(() => {
+    fetch("/api/tasks")
+      .then((r) => r.json())
+      .then((data: AdminTaskRow[]) => setTasks(data))
+      .catch((e) => console.error("Failed to load tasks", e));
+  }, []);
 
   const [filterLanguage, setFilterLanguage] = useState<string>("English");
   const [filterStatus, setFilterStatus] = useState<TaskStatus | "all">("all");
@@ -104,24 +100,31 @@ export default function AdminPage() {
     setCreateModalOpen(true);
   };
 
-  const handleConfirmCreate = () => {
+  const handleConfirmCreate = async () => {
     if (!createTopic.trim()) return;
     setCreating(true);
-
-    const newTask: AdminTaskRow = {
-      id: `task-${Date.now()}`,
-      title: createTopic.trim(),
-      language: createLanguage,
-      status: "draft",
-      createdAt: new Date().toISOString(),
-    };
-    setTasks((prev) => [newTask, ...prev]);
-
-    setTimeout(() => {
-      setCreating(false);
+    try {
+      const body: AdminTaskRow = {
+        id: `task-${Date.now()}`,
+        title: createTopic.trim(),
+        language: createLanguage,
+        status: "draft",
+        createdAt: new Date().toISOString(),
+      };
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const created = (await res.json()) as AdminTaskRow;
+      setTasks((prev) => [created, ...prev]);
       setCreateModalOpen(false);
-      router.push("/edit");
-    }, 2000);
+      router.push(`/edit/task/${created.id}`);
+    } catch (e) {
+      console.error("Failed to create task", e);
+    } finally {
+      setCreating(false);
+    }
   };
 
   const renderOverview = () => {
@@ -328,7 +331,7 @@ export default function AdminPage() {
                           {t.status === "pending_review" ? (
                             <button
                               type="button"
-                              onClick={() => router.push("/edit")}
+                              onClick={() => router.push(`/edit/task/${t.id}`)}
                               className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
                             >
                               Review
@@ -336,7 +339,7 @@ export default function AdminPage() {
                           ) : (
                             <button
                               type="button"
-                              onClick={() => router.push("/edit")}
+                              onClick={() => router.push(`/edit/task/${t.id}`)}
                               className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
                             >
                               Open
