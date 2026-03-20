@@ -19,6 +19,7 @@ import type {
 } from "@/lib/types";
 
 type TabKey =
+  | "tlts"
   | "phase1"
   | "phase2"
   | "phase3"
@@ -263,6 +264,109 @@ function QuestionListEditor({ questions, onChange }: QuestionListEditorProps) {
       >
         Add question
       </button>
+    </div>
+  );
+}
+
+// ── TLTS Editor ──────────────────────────────────────────────────────────────
+
+interface TltItem {
+  id: string;
+  text: string;
+}
+
+function genTltId(prefix: string, existing: string[]): string {
+  let n = 1;
+  while (existing.includes(`${prefix}${n}`)) n++;
+  return `${prefix}${n}`;
+}
+
+interface TltSectionProps {
+  label: string;
+  items: TltItem[];
+  prefix: string;
+  onChange: (next: TltItem[]) => void;
+}
+
+function TltSection({ label, items, prefix, onChange }: TltSectionProps) {
+  const addItem = () => {
+    const id = genTltId(prefix, items.map((i) => i.id));
+    onChange([...items, { id, text: "" }]);
+  };
+
+  const updateItem = (idx: number, text: string) => {
+    const next = [...items];
+    next[idx] = { ...next[idx], text };
+    onChange(next);
+  };
+
+  const removeItem = (idx: number) => {
+    onChange(items.filter((_, i) => i !== idx));
+  };
+
+  const singular = label.slice(0, -1).toLowerCase();
+
+  return (
+    <div className="space-y-3">
+      <p className="font-semibold text-slate-800">{label}</p>
+      {items.length === 0 && (
+        <p className="text-sm italic text-slate-400">No {label.toLowerCase()} yet.</p>
+      )}
+      {items.map((item, idx) => (
+        <div key={item.id} className="flex items-center gap-2">
+          <span className="w-5 shrink-0 text-right text-xs text-slate-400">{idx + 1}.</span>
+          <input
+            type="text"
+            value={item.text}
+            onChange={(e) => updateItem(idx, e.target.value)}
+            placeholder={`Enter ${singular}…`}
+            className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm"
+          />
+          <button
+            type="button"
+            onClick={() => removeItem(idx)}
+            className="text-sm text-red-600 hover:underline"
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addItem}
+        className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+      >
+        Add {singular}
+      </button>
+    </div>
+  );
+}
+
+function TltsEditor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
+  const { tlts } = task.taskModel;
+
+  const wordsArr: TltItem[] = Object.entries(tlts.words).map(([id, text]) => ({ id, text }));
+  const phrasesArr: TltItem[] = Object.entries(tlts.phrases).map(([id, text]) => ({ id, text }));
+  const sentencesArr: TltItem[] = Object.entries(tlts.sentences).map(([id, text]) => ({ id, text }));
+
+  const toDict = (items: TltItem[]) => Object.fromEntries(items.map(({ id, text }) => [id, text]));
+
+  const updateWords = (next: TltItem[]) =>
+    setTask({ ...task, taskModel: { ...task.taskModel, tlts: { ...tlts, words: toDict(next) } } });
+
+  const updatePhrases = (next: TltItem[]) =>
+    setTask({ ...task, taskModel: { ...task.taskModel, tlts: { ...tlts, phrases: toDict(next) } } });
+
+  const updateSentences = (next: TltItem[]) =>
+    setTask({ ...task, taskModel: { ...task.taskModel, tlts: { ...tlts, sentences: toDict(next) } } });
+
+  return (
+    <div className="space-y-8">
+      <TltSection label="Words" items={wordsArr} prefix="w" onChange={updateWords} />
+      <hr className="border-slate-200" />
+      <TltSection label="Phrases" items={phrasesArr} prefix="p" onChange={updatePhrases} />
+      <hr className="border-slate-200" />
+      <TltSection label="Sentences" items={sentencesArr} prefix="s" onChange={updateSentences} />
     </div>
   );
 }
@@ -1228,6 +1332,8 @@ export default function TaskEditPage() {
   const renderTabContent = () => {
     if (!task) return null;
     switch (activeTab) {
+      case "tlts":
+        return <TltsEditor task={task} setTask={setTask} />;
       case "phase1":
         return <Phase1Editor task={task} setTask={setTask} />;
       case "phase2":
@@ -1317,6 +1423,7 @@ export default function TaskEditPage() {
             <section className="flex flex-col space-y-4">
               <div className="flex flex-wrap gap-2">
                 {[
+                  { key: "tlts", label: "TLTS" },
                   { key: "phase1", label: "Phase 1 – Entry" },
                   { key: "phase2", label: "Phase 2 – Warmup" },
                   { key: "phase3", label: "Phase 3 – Language items" },
