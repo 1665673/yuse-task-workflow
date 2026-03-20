@@ -35,144 +35,290 @@ function findPhase(task: TaskPackage | null, type: string): { phase: Phase | nul
   return { phase: index >= 0 ? task.phases[index] : null, index };
 }
 
+// ── Shared asset types & helpers ─────────────────────────────────────────────
+
+interface AssetItem {
+  id: string;
+  prompt: string;
+  url: string;
+}
+
+function taskImageAssets(task: TaskPackage): AssetItem[] {
+  return Object.entries(task.taskModel.assets.images ?? {}).map(([id, a]) => ({
+    id,
+    prompt: a.prompt ?? "",
+    url: a.url ?? "",
+  }));
+}
+
+function taskAudioAssets(task: TaskPackage): AssetItem[] {
+  return Object.entries(task.taskModel.assets.audios ?? {}).map(([id, a]) => ({
+    id,
+    prompt: a.prompt ?? "",
+    url: a.url ?? "",
+  }));
+}
+
+// ── Question Editor Components ────────────────────────────────────────────────
+
+function AudioInlinePlay({ url }: { url: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => () => { audioRef.current?.pause(); }, []);
+
+  const toggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const el = audioRef.current;
+    if (!el || !url) return;
+    if (playing) { el.pause(); setPlaying(false); }
+    else { el.play().then(() => setPlaying(true)).catch(() => {}); }
+  };
+
+  return (
+    <>
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      <audio ref={audioRef} src={url || undefined} onEnded={() => setPlaying(false)} />
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={!url}
+        title={playing ? "Pause" : "Play"}
+        className="shrink-0 rounded-full p-0.5 text-slate-500 hover:bg-slate-200 disabled:opacity-40"
+      >
+        {playing ? (
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+            <path d="M5.75 3a.75.75 0 0 0-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 0 0 .75-.75V3.75A.75.75 0 0 0 7.25 3h-1.5zM12.75 3a.75.75 0 0 0-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 0 0 .75-.75V3.75a.75.75 0 0 0-.75-.75h-1.5z" />
+          </svg>
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+            <path d="M7 4a3 3 0 0 1 6 0v6a3 3 0 1 1-6 0V4z" />
+            <path d="M5.5 9.643a.75.75 0 0 0-1.5 0V10c0 3.06 2.29 5.585 5.25 5.954V17.5h-1.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-1.5v-1.546A6.001 6.001 0 0 0 16 10v-.357a.75.75 0 0 0-1.5 0V10a4.5 4.5 0 0 1-9 0v-.357z" />
+          </svg>
+        )}
+      </button>
+    </>
+  );
+}
+
+interface AssetSelectProps {
+  value: string | undefined;
+  assetType: "image" | "audio";
+  options: AssetItem[];
+  onChange: (id: string | undefined) => void;
+}
+
+function AssetSelect({ value, assetType, options, onChange }: AssetSelectProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selected = options.find((o) => o.id === value);
+
+  const MicIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0 text-slate-400">
+      <path d="M7 4a3 3 0 0 1 6 0v6a3 3 0 1 1-6 0V4z" />
+      <path d="M5.5 9.643a.75.75 0 0 0-1.5 0V10c0 3.06 2.29 5.585 5.25 5.954V17.5h-1.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-1.5v-1.546A6.001 6.001 0 0 0 16 10v-.357a.75.75 0 0 0-1.5 0V10a4.5 4.5 0 0 1-9 0v-.357z" />
+    </svg>
+  );
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 rounded border border-slate-300 bg-white px-2 py-1 text-left text-sm hover:bg-slate-50"
+      >
+        {selected ? (
+          <>
+            {assetType === "image" && (
+              <img src={selected.url || undefined} alt="" className="h-5 w-5 shrink-0 rounded bg-slate-100 object-cover" />
+            )}
+            {assetType === "audio" && <MicIcon />}
+            <span className="flex-1 truncate text-slate-700">{selected.prompt || selected.id}</span>
+            <span className="shrink-0 font-mono text-xs text-slate-400">{selected.id}</span>
+          </>
+        ) : (
+          <span className="flex-1 text-slate-400">— none —</span>
+        )}
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0 text-slate-400">
+          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06z" clipRule="evenodd" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 max-h-52 w-full overflow-auto rounded border border-slate-200 bg-white shadow-lg">
+          <button
+            type="button"
+            onClick={() => { onChange(undefined); setOpen(false); }}
+            className="flex w-full items-center px-2 py-1.5 text-sm text-slate-400 hover:bg-slate-50"
+          >
+            — none —
+          </button>
+          {options.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => { onChange(opt.id); setOpen(false); }}
+              className="flex w-full items-center gap-2 px-2 py-1.5 text-sm hover:bg-blue-50"
+            >
+              {assetType === "image" && (
+                <img src={opt.url || undefined} alt="" className="h-7 w-7 shrink-0 rounded bg-slate-100 object-cover" />
+              )}
+              {assetType === "audio" && <AudioInlinePlay url={opt.url} />}
+              <span className="flex-1 truncate text-slate-700">{opt.prompt || opt.id}</span>
+              <span className="shrink-0 font-mono text-xs text-slate-400">{opt.id}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface QuestionListEditorProps {
   questions: Question[];
   onChange: (next: Question[]) => void;
+  imageAssets: AssetItem[];
+  audioAssets: AssetItem[];
 }
 
-function QuestionListEditor({ questions, onChange }: QuestionListEditorProps) {
+function QuestionListEditor({ questions, onChange, imageAssets, audioAssets }: QuestionListEditorProps) {
   const updateQuestion = (idx: number, next: Question) => {
     const copy = [...questions];
     copy[idx] = next;
     onChange(copy);
   };
 
-  const removeQuestion = (idx: number) => {
-    const copy = questions.filter((_, i) => i !== idx);
-    onChange(copy);
-  };
+  const removeQuestion = (idx: number) => onChange(questions.filter((_, i) => i !== idx));
 
   const addQuestion = () => {
-    const q: Question = {
-      type: "text_text",
-      stem: { text: "" },
-      options: [{ text: "" }],
-      correctOptionIndexes: [0],
-    };
-    onChange([...questions, q]);
+    onChange([...questions, { type: "text_text", stem: { text: "" }, options: [{ text: "" }], correctOptionIndexes: [0] }]);
+  };
+
+  const changeType = (idx: number, newType: Question["type"]) => {
+    const q = questions[idx];
+    let stem = { ...q.stem };
+    let options = q.options.map((o) => ({ ...o }));
+    if (newType === "audio_text") {
+      stem = { audioAssetId: stem.audioAssetId };
+      options = options.map((o) => ({ text: o.text ?? "", explanation: o.explanation }));
+    } else {
+      stem = { text: stem.text ?? "" };
+      if (newType === "text_image") {
+        options = options.map((o) => ({ imageAssetId: o.imageAssetId, explanation: o.explanation }));
+      } else {
+        options = options.map((o) => ({ text: o.text ?? "", explanation: o.explanation }));
+      }
+    }
+    updateQuestion(idx, { ...q, type: newType, stem, options });
   };
 
   return (
     <div className="space-y-4">
       {questions.map((q, idx) => (
-        <div key={idx} className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+        <div key={idx} className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+          {/* Header */}
           <div className="flex items-center justify-between">
             <p className="font-medium text-slate-800">Question {idx + 1}</p>
-            <button
-              type="button"
-              onClick={() => removeQuestion(idx)}
-              className="text-sm text-red-600 hover:underline"
-            >
+            <button type="button" onClick={() => removeQuestion(idx)} className="text-sm text-red-600 hover:underline">
               Remove
             </button>
           </div>
 
+          {/* Type + Guidance */}
           <div className="grid gap-3 md:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm">
               <span className="font-medium text-slate-700">Type</span>
               <select
                 value={q.type}
-                onChange={(e) => updateQuestion(idx, { ...q, type: e.target.value as Question["type"] })}
+                onChange={(e) => changeType(idx, e.target.value as Question["type"])}
                 className="rounded border border-slate-300 px-2 py-1 text-sm"
               >
-                <option value="text_text">text_text</option>
-                <option value="text_image">text_image</option>
-                <option value="text_cloze">text_cloze</option>
-                <option value="audio_text">audio_text</option>
+                <option value="text_text">Stem as text, Options as text</option>
+                <option value="text_image">Stem as text, Options as image</option>
+                <option value="text_cloze">Stem as text, Options as text (cloze)</option>
+                <option value="audio_text">Stem as audio, Options as text</option>
               </select>
             </label>
-
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-slate-700">Guidance purpose (optional)</span>
-              <input
-                type="text"
-                value={q.guidance?.purpose ?? ""}
-                onChange={(e) =>
-                  updateQuestion(idx, {
-                    ...q,
-                    guidance: { ...(q.guidance ?? { description: "" }), purpose: e.target.value },
-                  })
-                }
-                className="rounded border border-slate-300 px-2 py-1 text-sm"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-slate-700">Guidance description (optional)</span>
-              <textarea
-                value={q.guidance?.description ?? ""}
-                onChange={(e) =>
-                  updateQuestion(idx, {
-                    ...q,
-                    guidance: { ...(q.guidance ?? { purpose: "" }), description: e.target.value },
-                  })
-                }
-                className="rounded border border-slate-300 px-2 py-1 text-sm"
-                rows={2}
-              />
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm md:col-span-2">
-              <span className="font-medium text-slate-700">Stem text</span>
-              <input
-                type="text"
-                value={q.stem.text ?? ""}
-                onChange={(e) => updateQuestion(idx, { ...q, stem: { ...q.stem, text: e.target.value } })}
-                className="rounded border border-slate-300 px-2 py-1 text-sm"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-slate-700">Stem imageAssetId</span>
-              <input
-                type="text"
-                value={q.stem.imageAssetId ?? ""}
-                onChange={(e) =>
-                  updateQuestion(idx, { ...q, stem: { ...q.stem, imageAssetId: e.target.value || undefined } })
-                }
-                className="rounded border border-slate-300 px-2 py-1 text-sm"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-slate-700">Stem audioAssetId</span>
-              <input
-                type="text"
-                value={q.stem.audioAssetId ?? ""}
-                onChange={(e) =>
-                  updateQuestion(idx, { ...q, stem: { ...q.stem, audioAssetId: e.target.value || undefined } })
-                }
-                className="rounded border border-slate-300 px-2 py-1 text-sm"
-              />
-            </label>
+            {/* Guidance fields hidden for now — data preserved */}
+            {false && (
+              <>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="font-medium text-slate-700">Guidance purpose (optional)</span>
+                  <input
+                    type="text"
+                    value={q.guidance?.purpose ?? ""}
+                    onChange={(e) =>
+                      updateQuestion(idx, { ...q, guidance: { ...(q.guidance ?? { description: "" }), purpose: e.target.value } })
+                    }
+                    className="rounded border border-slate-300 px-2 py-1 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm md:col-span-2">
+                  <span className="font-medium text-slate-700">Guidance description (optional)</span>
+                  <textarea
+                    value={q.guidance?.description ?? ""}
+                    onChange={(e) =>
+                      updateQuestion(idx, { ...q, guidance: { ...(q.guidance ?? { purpose: "" }), description: e.target.value } })
+                    }
+                    rows={2}
+                    className="rounded border border-slate-300 px-2 py-1 text-sm"
+                  />
+                </label>
+              </>
+            )}
           </div>
 
+          {/* Stem */}
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium text-slate-700">Stem</p>
+            {q.type !== "audio_text" ? (
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-slate-600">Text</span>
+                <input
+                  type="text"
+                  value={q.stem.text ?? ""}
+                  onChange={(e) => updateQuestion(idx, { ...q, stem: { text: e.target.value } })}
+                  className="rounded border border-slate-300 px-2 py-1 text-sm"
+                />
+              </label>
+            ) : (
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-slate-600">Audio asset</span>
+                <AssetSelect
+                  value={q.stem.audioAssetId}
+                  assetType="audio"
+                  options={audioAssets}
+                  onChange={(id) => updateQuestion(idx, { ...q, stem: { audioAssetId: id } })}
+                />
+              </label>
+            )}
+          </div>
+
+          {/* Options */}
           <div className="space-y-2">
             <p className="text-sm font-medium text-slate-700">Options</p>
             {q.options.map((opt, oIdx) => {
               const isCorrect = q.correctOptionIndexes.includes(oIdx);
               const toggleCorrect = () => {
                 const set = new Set(q.correctOptionIndexes);
-                if (set.has(oIdx)) set.delete(oIdx);
-                else set.add(oIdx);
+                if (set.has(oIdx)) set.delete(oIdx); else set.add(oIdx);
                 updateQuestion(idx, { ...q, correctOptionIndexes: Array.from(set).sort((a, b) => a - b) });
               };
-              const updateOption = (next: typeof opt) => {
+              const updateOpt = (patch: Partial<typeof opt>) => {
                 const opts = [...q.options];
-                opts[oIdx] = next;
+                opts[oIdx] = { ...opt, ...patch };
                 updateQuestion(idx, { ...q, options: opts });
               };
-              const removeOption = () => {
+              const removeOpt = () => {
                 const opts = q.options.filter((_, i) => i !== oIdx);
                 const newCorrect = q.correctOptionIndexes
                   .filter((ci) => ci !== oIdx)
@@ -180,73 +326,55 @@ function QuestionListEditor({ questions, onChange }: QuestionListEditorProps) {
                 updateQuestion(idx, { ...q, options: opts, correctOptionIndexes: newCorrect });
               };
               return (
-                <div
-                  key={oIdx}
-                  className="grid gap-2 rounded border border-slate-200 bg-slate-50 p-2 text-sm md:grid-cols-3"
-                >
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={isCorrect}
-                      onChange={toggleCorrect}
-                      className="h-4 w-4"
+                <div key={oIdx} className="space-y-1.5 rounded border border-slate-200 bg-slate-50 p-2">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={isCorrect} onChange={toggleCorrect} className="h-4 w-4" />
+                      <span className="font-medium text-slate-700">Correct</span>
+                    </label>
+                    <button type="button" onClick={removeOpt} className="text-xs text-red-600 hover:underline">
+                      Remove
+                    </button>
+                  </div>
+                  {q.type === "text_image" ? (
+                    <AssetSelect
+                      value={opt.imageAssetId}
+                      assetType="image"
+                      options={imageAssets}
+                      onChange={(id) => updateOpt({ imageAssetId: id })}
                     />
-                    <span className="font-medium text-slate-700">Correct</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Option text"
-                    value={opt.text ?? ""}
-                    onChange={(e) => updateOption({ ...opt, text: e.target.value })}
-                    className="rounded border border-slate-300 px-2 py-1"
-                  />
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="Option text"
+                      value={opt.text ?? ""}
+                      onChange={(e) => updateOpt({ text: e.target.value })}
+                      className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                    />
+                  )}
                   <input
                     type="text"
                     placeholder="Explanation (optional)"
                     value={opt.explanation ?? ""}
-                    onChange={(e) => updateOption({ ...opt, explanation: e.target.value || undefined })}
-                    className="rounded border border-slate-300 px-2 py-1"
+                    onChange={(e) => updateOpt({ explanation: e.target.value || undefined })}
+                    className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
                   />
-                  <input
-                    type="text"
-                    placeholder="imageAssetId"
-                    value={opt.imageAssetId ?? ""}
-                    onChange={(e) => updateOption({ ...opt, imageAssetId: e.target.value || undefined })}
-                    className="rounded border border-slate-300 px-2 py-1 md:col-span-1"
-                  />
-                  <input
-                    type="text"
-                    placeholder="audioAssetId"
-                    value={opt.audioAssetId ?? ""}
-                    onChange={(e) => updateOption({ ...opt, audioAssetId: e.target.value || undefined })}
-                    className="rounded border border-slate-300 px-2 py-1 md:col-span-1"
-                  />
-                  <div className="flex justify-end md:col-span-1">
-                    <button
-                      type="button"
-                      onClick={removeOption}
-                      className="text-xs text-red-600 hover:underline"
-                    >
-                      Remove option
-                    </button>
-                  </div>
                 </div>
               );
             })}
             <button
               type="button"
-              onClick={() =>
-                updateQuestion(idx, {
-                  ...q,
-                  options: [...q.options, { text: "" }],
-                })
-              }
+              onClick={() => {
+                const newOpt = q.type === "text_image" ? {} : { text: "" };
+                updateQuestion(idx, { ...q, options: [...q.options, newOpt] });
+              }}
               className="text-sm text-blue-600 hover:underline"
             >
               Add option
             </button>
           </div>
 
+          {/* Hint */}
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium text-slate-700">Hint (optional)</span>
             <input
@@ -271,12 +399,6 @@ function QuestionListEditor({ questions, onChange }: QuestionListEditorProps) {
 }
 
 // ── Assets Editor ────────────────────────────────────────────────────────────
-
-interface AssetItem {
-  id: string;
-  prompt: string;
-  url: string;
-}
 
 function genAssetId(prefix: string, existing: string[]): string {
   let id: string;
@@ -765,6 +887,8 @@ function Phase2Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
         <QuestionListEditor
           questions={step.warmupQuestions ?? []}
           onChange={(next) => updateStep({ ...step, warmupQuestions: next })}
+          imageAssets={taskImageAssets(task)}
+          audioAssets={taskAudioAssets(task)}
         />
       </div>
     </div>
@@ -851,7 +975,12 @@ function Phase3Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                 Remove item
               </button>
             </div>
-            <QuestionListEditor questions={qs} onChange={(nextQs) => updateQuestionsForKey(key, nextQs)} />
+            <QuestionListEditor
+              questions={qs}
+              onChange={(nextQs) => updateQuestionsForKey(key, nextQs)}
+              imageAssets={taskImageAssets(task)}
+              audioAssets={taskAudioAssets(task)}
+            />
           </div>
         ))}
         <button
