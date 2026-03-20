@@ -19,6 +19,7 @@ import type {
 } from "@/lib/types";
 
 type TabKey =
+  | "info"
   | "tlts"
   | "phase1"
   | "phase2"
@@ -1301,7 +1302,7 @@ export default function TaskEditPage() {
   const [task, setTask] = useState<TaskPackage | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabKey>("phase1");
+  const [activeTab, setActiveTab] = useState<TabKey>("info");
 
   useEffect(() => {
     const load = async () => {
@@ -1332,6 +1333,38 @@ export default function TaskEditPage() {
   const renderTabContent = () => {
     if (!task) return null;
     switch (activeTab) {
+      case "info":
+        return (
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-slate-700">Task ID</span>
+              <input
+                type="text"
+                value={task.id}
+                onChange={(e) => setTask({ ...task, id: e.target.value })}
+                className="rounded border border-slate-300 px-2 py-1 text-sm"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-slate-700">Title</span>
+              <input
+                type="text"
+                value={task.title}
+                onChange={(e) => setTask({ ...task, title: e.target.value })}
+                className="rounded border border-slate-300 px-2 py-1 text-sm"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm md:col-span-2">
+              <span className="font-medium text-slate-700">Description</span>
+              <textarea
+                value={task.description}
+                onChange={(e) => setTask({ ...task, description: e.target.value })}
+                rows={3}
+                className="rounded border border-slate-300 px-2 py-1 text-sm"
+              />
+            </label>
+          </div>
+        );
       case "tlts":
         return <TltsEditor task={task} setTask={setTask} />;
       case "phase1":
@@ -1388,41 +1421,10 @@ export default function TaskEditPage() {
 
         {!loading && task && (
           <>
-            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className="font-medium text-slate-700">Task ID</span>
-                  <input
-                    type="text"
-                    value={task.id}
-                    onChange={(e) => setTask({ ...task, id: e.target.value })}
-                    className="rounded border border-slate-300 px-2 py-1 text-sm"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className="font-medium text-slate-700">Title</span>
-                  <input
-                    type="text"
-                    value={task.title}
-                    onChange={(e) => setTask({ ...task, title: e.target.value })}
-                    className="rounded border border-slate-300 px-2 py-1 text-sm"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-sm md:col-span-2">
-                  <span className="font-medium text-slate-700">Description</span>
-                  <textarea
-                    value={task.description}
-                    onChange={(e) => setTask({ ...task, description: e.target.value })}
-                    rows={2}
-                    className="rounded border border-slate-300 px-2 py-1 text-sm"
-                  />
-                </label>
-              </div>
-            </section>
-
             <section className="flex flex-col space-y-4">
               <div className="flex flex-wrap gap-2">
                 {[
+                  { key: "info", label: "Info" },
                   { key: "tlts", label: "TLTS" },
                   { key: "phase1", label: "Phase 1 – Entry" },
                   { key: "phase2", label: "Phase 2 – Warmup" },
@@ -1451,15 +1453,6 @@ export default function TaskEditPage() {
               </div>
             </section>
 
-            <section className="space-y-2">
-              <p className="text-sm font-medium text-slate-700">Live JSON preview</p>
-              <textarea
-                value={JSON.stringify(task, null, 2)}
-                readOnly
-                rows={10}
-                className="w-full rounded-lg border border-slate-200 bg-slate-900 p-3 text-xs font-mono text-slate-50"
-              />
-            </section>
           </>
         )}
       </div>
