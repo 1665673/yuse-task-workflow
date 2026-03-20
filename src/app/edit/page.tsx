@@ -389,19 +389,9 @@ function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-slate-700">Call to action text</span>
-          <input
-            type="text"
-            value={step.callToActionText}
-            onChange={(e) => updateStep({ ...step, callToActionText: e.target.value })}
-            className="rounded border border-slate-300 px-2 py-1 text-sm"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-slate-700">Step guidance purpose</span>
-          <input
-            type="text"
+        <label className="flex flex-col gap-1 text-sm md:col-span-2">
+          <span className="font-medium text-slate-700">Task purpose</span>
+          <textarea
             value={step.guidance?.purpose ?? ""}
             onChange={(e) =>
               updateStep({
@@ -409,11 +399,12 @@ function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                 guidance: { ...(step.guidance ?? { description: "" }), purpose: e.target.value },
               })
             }
+            rows={3}
             className="rounded border border-slate-300 px-2 py-1 text-sm"
           />
         </label>
         <label className="flex flex-col gap-1 text-sm md:col-span-2">
-          <span className="font-medium text-slate-700">Step guidance description</span>
+          <span className="font-medium text-slate-700">Task description</span>
           <textarea
             value={step.guidance?.description ?? ""}
             onChange={(e) =>
@@ -426,14 +417,15 @@ function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
             className="rounded border border-slate-300 px-2 py-1 text-sm"
           />
         </label>
-      </div>
-
-      <div className="space-y-3">
-        <p className="font-medium text-slate-800">Entry questions</p>
-        <QuestionListEditor
-          questions={step.entryQuestions ?? []}
-          onChange={(next) => updateStep({ ...step, entryQuestions: next })}
-        />
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium text-slate-700">Button text</span>
+          <input
+            type="text"
+            value={step.callToActionText}
+            onChange={(e) => updateStep({ ...step, callToActionText: e.target.value })}
+            className="rounded border border-slate-300 px-2 py-1 text-sm"
+          />
+        </label>
       </div>
     </div>
   );
