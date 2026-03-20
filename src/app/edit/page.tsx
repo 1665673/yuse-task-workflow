@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   Question,
   TaskPackage,
@@ -20,6 +20,7 @@ import type {
 
 type TabKey =
   | "info"
+  | "assets"
   | "tlts"
   | "phase1"
   | "phase2"
@@ -265,6 +266,287 @@ function QuestionListEditor({ questions, onChange }: QuestionListEditorProps) {
       >
         Add question
       </button>
+    </div>
+  );
+}
+
+// ── Assets Editor ────────────────────────────────────────────────────────────
+
+interface AssetItem {
+  id: string;
+  prompt: string;
+  url: string;
+}
+
+function genAssetId(prefix: string, existing: string[]): string {
+  let id: string;
+  do {
+    id = `${prefix}_${Math.random().toString(16).slice(2, 12).padEnd(10, "0")}`;
+  } while (existing.includes(id));
+  return id;
+}
+
+function isDataUrl(url: string): boolean {
+  return url.startsWith("data:");
+}
+
+function ImagePreview({ url }: { url: string }) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [url]);
+
+  if (!url || broken) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <span className="text-xs text-slate-400">no preview</span>
+      </div>
+    );
+  }
+  return (
+    <img
+      src={url}
+      alt=""
+      onError={() => setBroken(true)}
+      className="h-full w-full object-cover"
+    />
+  );
+}
+
+function AudioPreview({ url }: { url: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    const onEnded = () => setPlaying(false);
+    el.addEventListener("ended", onEnded);
+    return () => el.removeEventListener("ended", onEnded);
+  }, []);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (el) { el.pause(); el.load(); }
+    setPlaying(false);
+  }, [url]);
+
+  const toggle = () => {
+    const el = audioRef.current;
+    if (!el || !url) return;
+    if (playing) {
+      el.pause();
+      setPlaying(false);
+    } else {
+      el.play().then(() => setPlaying(true)).catch(() => {});
+    }
+  };
+
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-1">
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      <audio ref={audioRef} src={url || undefined} />
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={!url}
+        title={playing ? "Pause" : "Play audio"}
+        className={`rounded-full p-3 transition-colors ${
+          url
+            ? "bg-slate-200 hover:bg-slate-300 text-slate-700"
+            : "cursor-not-allowed bg-slate-100 text-slate-300"
+        }`}
+      >
+        {playing ? (
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6">
+            <path fillRule="evenodd" d="M6.75 5.25a.75.75 0 0 1 .75-.75H9a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H7.5a.75.75 0 0 1-.75-.75V5.25zm7.5 0A.75.75 0 0 1 15 4.5h1.5a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H15a.75.75 0 0 1-.75-.75V5.25z" clipRule="evenodd" />
+          </svg>
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6">
+            <path d="M8.25 4.5a3.75 3.75 0 1 1 7.5 0v8.25a3.75 3.75 0 1 1-7.5 0V4.5z" />
+            <path d="M6 10.5a.75.75 0 0 1 .75.75v1.5a5.25 5.25 0 1 0 10.5 0v-1.5a.75.75 0 0 1 1.5 0v1.5a6.751 6.751 0 0 1-6 6.709v2.291h3a.75.75 0 0 1 0 1.5h-7.5a.75.75 0 0 1 0-1.5h3v-2.291a6.751 6.751 0 0 1-6-6.709v-1.5A.75.75 0 0 1 6 10.5z" />
+          </svg>
+        )}
+      </button>
+      {!url && <span className="text-xs text-slate-400">no audio</span>}
+    </div>
+  );
+}
+
+interface AssetSectionProps {
+  label: string;
+  assetType: "image" | "audio";
+  items: AssetItem[];
+  onChange: (next: AssetItem[]) => void;
+}
+
+function AssetSection({ label, assetType, items, onChange }: AssetSectionProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
+
+  const prefix = assetType === "image" ? "img" : "aud";
+  const accept = assetType === "image" ? "image/*" : "audio/*";
+
+  const addItem = () => {
+    const id = genAssetId(prefix, items.map((i) => i.id));
+    onChange([...items, { id, prompt: "", url: "" }]);
+  };
+
+  const removeItem = (idx: number) => onChange(items.filter((_, i) => i !== idx));
+
+  const updateItem = (idx: number, patch: Partial<AssetItem>) => {
+    const next = [...items];
+    next[idx] = { ...next[idx], ...patch };
+    onChange(next);
+  };
+
+  const handleUploadClick = (idx: number) => {
+    setUploadingIdx(idx);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || uploadingIdx === null) return;
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (data.url) updateItem(uploadingIdx, { url: data.url });
+    } catch (err) {
+      console.error("Upload failed", err);
+    } finally {
+      setUploadingIdx(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="font-semibold text-slate-800">{label}</p>
+      <input ref={fileInputRef} type="file" accept={accept} className="hidden" onChange={handleFileChange} />
+
+      {items.length === 0 && (
+        <p className="text-sm italic text-slate-400">No {label.toLowerCase()} yet.</p>
+      )}
+
+      {items.map((item, idx) => {
+        const isData = isDataUrl(item.url);
+        const isUploading = uploadingIdx === idx;
+        return (
+          <div key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-xs text-slate-400">{item.id}</span>
+              <button
+                type="button"
+                onClick={() => removeItem(idx)}
+                className="text-sm text-red-600 hover:underline"
+              >
+                Remove
+              </button>
+            </div>
+
+            {/* Body: preview + fields */}
+            <div className="flex gap-3">
+              {/* Square preview */}
+              <div className="h-28 w-28 shrink-0 overflow-hidden rounded border border-slate-200 bg-white">
+                {assetType === "image"
+                  ? <ImagePreview url={item.url} />
+                  : <AudioPreview url={item.url} />}
+              </div>
+
+              {/* Fields */}
+              <div className="flex flex-1 flex-col gap-2">
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="font-medium text-slate-700">Prompt</span>
+                  <textarea
+                    value={item.prompt}
+                    onChange={(e) => updateItem(idx, { prompt: e.target.value })}
+                    rows={1}
+                    placeholder="Describe asset for generation…"
+                    className="rounded border border-slate-300 px-2 py-1 text-sm"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="font-medium text-slate-700">URL</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={isData ? "" : item.url}
+                      placeholder={isData ? "<data-url>" : "https://…"}
+                      disabled={isData}
+                      onChange={(e) => updateItem(idx, { url: e.target.value })}
+                      className={`flex-1 rounded border px-2 py-1 text-sm ${
+                        isData
+                          ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                          : "border-slate-300"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      disabled={isUploading}
+                      onClick={() => handleUploadClick(idx)}
+                      className="shrink-0 rounded border border-slate-300 bg-white px-2 py-1 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isUploading ? "Uploading…" : "Upload"}
+                    </button>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      <button
+        type="button"
+        onClick={addItem}
+        className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+      >
+        Add {assetType}
+      </button>
+    </div>
+  );
+}
+
+function AssetsEditor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
+  const { assets } = task.taskModel;
+
+  const toItems = (dict: Record<string, { prompt?: string; url?: string }>): AssetItem[] =>
+    Object.entries(dict).map(([id, a]) => ({ id, prompt: a.prompt ?? "", url: a.url ?? "" }));
+
+  const toDict = (items: AssetItem[]): Record<string, { prompt?: string; url?: string }> =>
+    Object.fromEntries(
+      items.map(({ id, prompt, url }) => [
+        id,
+        {
+          ...(prompt ? { prompt } : {}),
+          ...(url ? { url } : {}),
+        },
+      ])
+    );
+
+  const imagesArr = toItems(assets.images ?? {});
+  const audiosArr = toItems(assets.audios ?? {});
+
+  const updateImages = (next: AssetItem[]) =>
+    setTask({
+      ...task,
+      taskModel: { ...task.taskModel, assets: { ...assets, images: toDict(next) } },
+    });
+
+  const updateAudios = (next: AssetItem[]) =>
+    setTask({
+      ...task,
+      taskModel: { ...task.taskModel, assets: { ...assets, audios: toDict(next) } },
+    });
+
+  return (
+    <div className="space-y-8">
+      <AssetSection label="Images" assetType="image" items={imagesArr} onChange={updateImages} />
+      <hr className="border-slate-200" />
+      <AssetSection label="Audios" assetType="audio" items={audiosArr} onChange={updateAudios} />
     </div>
   );
 }
@@ -1357,6 +1639,8 @@ export default function TaskEditPage() {
             </label>
           </div>
         );
+      case "assets":
+        return <AssetsEditor task={task} setTask={setTask} />;
       case "tlts":
         return <TltsEditor task={task} setTask={setTask} />;
       case "phase1":
@@ -1417,6 +1701,7 @@ export default function TaskEditPage() {
               <div className="flex flex-wrap gap-2">
                 {[
                   { key: "info", label: "Info" },
+                  { key: "assets", label: "Assets" },
                   { key: "tlts", label: "TLTS" },
                   { key: "phase1", label: "Phase 1 – Entry" },
                   { key: "phase2", label: "Phase 2 – Warmup" },
