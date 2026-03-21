@@ -15,12 +15,23 @@ export interface TaskRecord {
 
 /**
  * In-memory task store keyed by task ID.
- * Simulates a MongoDB collection: { [id]: taskDocument }.
+ * Attached to `globalThis` so that Next.js HMR module re-evaluations during
+ * development do not wipe tasks that were added at runtime.
  * TODO: replace with real MongoDB driver when backend is ready.
  */
-const taskStore = new Map<string, TaskRecord>();
+declare global {
+  // eslint-disable-next-line no-var
+  var __taskStore: Map<string, TaskRecord> | undefined;
+}
 
-function seedStore() {
+if (!globalThis.__taskStore) {
+  globalThis.__taskStore = new Map<string, TaskRecord>();
+  seedStore(globalThis.__taskStore);
+}
+
+const taskStore = globalThis.__taskStore;
+
+function seedStore(store: Map<string, TaskRecord>) {
   try {
     const filePath = path.join(
       process.cwd(),
@@ -32,8 +43,8 @@ function seedStore() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const task = JSON.parse(raw) as Record<string, any>;
     const id = task.id as string;
-    if (id && !taskStore.has(id)) {
-      taskStore.set(id, {
+    if (id && !store.has(id)) {
+      store.set(id, {
         id,
         title: (task.title as string) ?? "Untitled",
         language:
@@ -49,7 +60,5 @@ function seedStore() {
     console.error("[task-store] Failed to seed sample task:", err);
   }
 }
-
-seedStore();
 
 export { taskStore };

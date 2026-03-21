@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import type { TaskPackage } from "@/lib/types";
 import {
   flattenTaskFlow,
@@ -42,6 +42,7 @@ const TARGET_LANG_LABELS: Record<string, string> = {
 
 export default function TaskDemoPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [task, setTask] = useState<TaskPackage | null>(null);
   const [screen, setScreen] = useState<Screen>("welcome");
   const [flowIndex, setFlowIndex] = useState(0);
@@ -194,6 +195,19 @@ export default function TaskDemoPage() {
   // Available languages: those that exist in task.locales
   const availableLocales = task?.locales ? Object.keys(task.locales) : [];
 
+  const backToAdmin = (
+    <button
+      type="button"
+      onClick={() => router.push("/admin")}
+      className="fixed left-4 top-4 z-50 flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+        <path fillRule="evenodd" d="M17 10a.75.75 0 0 1-.75.75H5.612l4.158 3.96a.75.75 0 1 1-1.04 1.08l-5.5-5.25a.75.75 0 0 1 0-1.08l5.5-5.25a.75.75 0 1 1 1.04 1.08L5.612 9.25H16.25A.75.75 0 0 1 17 10z" clipRule="evenodd" />
+      </svg>
+      Admin
+    </button>
+  );
+
   // Language switcher — shown whenever a task is loaded (always includes "Original")
   const langSwitcher = task && (
     <div className="fixed right-4 top-4 z-50">
@@ -215,6 +229,7 @@ export default function TaskDemoPage() {
   if (screen === "welcome") {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
+        {backToAdmin}
         {langSwitcher}
         <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <h1 className="mb-2 text-2xl font-semibold text-slate-800">
@@ -283,6 +298,7 @@ export default function TaskDemoPage() {
   if (screen === "loading") {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
+        {backToAdmin}
         <div className="text-slate-600">Loading task...</div>
       </main>
     );
@@ -294,6 +310,7 @@ export default function TaskDemoPage() {
 
     return (
       <main className="flex min-h-screen flex-col bg-slate-50 p-6">
+        {backToAdmin}
         {langSwitcher}
         <div className="mx-auto flex max-w-2xl flex-1 flex-col">
           <h2 className="mb-4 text-xl font-semibold text-slate-800">
@@ -323,6 +340,7 @@ export default function TaskDemoPage() {
 
     return (
       <main className="flex min-h-screen flex-col bg-slate-50 p-6">
+        {backToAdmin}
         {langSwitcher}
         <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
           {showStepGuidance && (
@@ -477,6 +495,7 @@ export default function TaskDemoPage() {
   if (screen === "complete") {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
+        {backToAdmin}
         {langSwitcher}
         <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <h1 className="mb-2 text-2xl font-semibold text-slate-800">

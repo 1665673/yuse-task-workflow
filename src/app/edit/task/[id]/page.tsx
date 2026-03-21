@@ -1981,10 +1981,15 @@ export default function TaskEditPage() {
                 Admin
               </button>
             </div>
-            <h1 className="text-2xl font-semibold text-slate-900">Edit Task</h1>
+            <h1 className="text-2xl font-semibold text-slate-900">
+              {isTargetMode
+                ? <>Create Learner Language for task: <span className="text-violet-700">{task?.title ?? id}</span>, id: <span className="font-mono text-base text-slate-500">{id}</span></>
+                : <>Edit Task: <span className="text-blue-700">{task?.title ?? id}</span>, id: <span className="font-mono text-base text-slate-500">{id}</span></>}
+            </h1>
             <p className="text-sm text-slate-600">
-              Edit the sample task JSON through structured phase editors. Changes are local in the browser; copy
-              the JSON when you&apos;re done.
+              {isTargetMode
+                ? "Translate learner-facing text fields into the target language. Add/remove controls are hidden; only text edits are saved."
+                : "Edit the task content through structured phase editors. Changes are saved to the in-memory store."}
             </p>
           </div>
           <div className="flex items-center gap-2">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type TaskStatus = "draft" | "pending_review" | "production";
@@ -54,6 +54,11 @@ export default function AdminPage() {
   const [creating, setCreating] = useState(false);
 
   const [langModalTaskId, setLangModalTaskId] = useState<string | null>(null);
+
+  const [aiWarning, setAiWarning] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
@@ -110,7 +115,67 @@ export default function AdminPage() {
   const openCreateModal = () => {
     setCreateTopic("");
     setCreateLanguage("English");
+    setAiWarning(false);
+    setImportError(null);
     setCreateModalOpen(true);
+  };
+
+  const handleDeleteTask = async (id: string, title: string) => {
+    if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Server error");
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+    } catch (e) {
+      console.error("Failed to delete task", e);
+      alert("Failed to delete the task. Please try again.");
+    }
+  };
+
+  const handleImportJson = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setImportError(null);
+    try {
+      const text = await file.text();
+      const taskJson = JSON.parse(text);
+      const id = taskJson.id ?? `task-${Date.now()}`;
+      const title = taskJson.title ?? file.name.replace(/\.json$/i, "");
+      const language =
+        taskJson.taskModelLanguage === "en"
+          ? "English"
+          : (taskJson.taskModelLanguage ?? "English");
+      const body = {
+        id,
+        title,
+        language,
+        status: "pending_review",
+        createdAt: new Date().toISOString(),
+        data: taskJson,
+      };
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("Server returned an error");
+      const created = (await res.json()) as AdminTaskRow;
+      setTasks((prev) => [
+        { id: created.id, title: created.title, language: created.language, status: created.status, createdAt: created.createdAt },
+        ...prev,
+      ]);
+      setCreateModalOpen(false);
+      setAiWarning(false);
+      setImportError(null);
+    } catch (err) {
+      setImportError(
+        err instanceof Error ? err.message : "Failed to import — check that the file is valid task JSON."
+      );
+    } finally {
+      setImporting(false);
+      if (importFileRef.current) importFileRef.current.value = "";
+    }
   };
 
   const handleConfirmCreate = async () => {
@@ -372,6 +437,16 @@ export default function AdminPage() {
                           >
                             Preview
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTask(t.id, t.title)}
+                            className="rounded-lg border border-red-200 bg-white p-1.5 text-red-400 hover:border-red-400 hover:bg-red-50 hover:text-red-600"
+                            title="Delete task"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                              <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5z" clipRule="evenodd" />
+                            </svg>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -499,12 +574,14 @@ export default function AdminPage() {
       </section>
 
       {createModalOpen && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-4">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
             <h2 className="mb-2 text-lg font-semibold text-slate-900">Create new task</h2>
             <p className="mb-4 text-sm text-slate-600">
               Choose the task language and enter a topic. AI backend will generate a new task based on the topic.
             </p>
+
+            {/* AI create form */}
             <div className="space-y-3">
               <label className="flex flex-col gap-1 text-sm">
                 <span className="font-medium text-slate-700">Language</span>
@@ -527,25 +604,84 @@ export default function AdminPage() {
                 />
               </label>
             </div>
-            {creating && (
-              <p className="mt-4 text-sm text-slate-600">Creating new task…</p>
+
+            {/* AI not-ready warning */}
+            {aiWarning && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="mt-0.5 h-4 w-4 shrink-0 text-amber-500">
+                  <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" clipRule="evenodd" />
+                </svg>
+                Create By AI is not ready. Please use the <strong className="mx-0.5">Import</strong> button below to manually import a task JSON.
+              </div>
             )}
-            <div className="mt-5 flex justify-end gap-2">
+
+            <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => !creating && setCreateModalOpen(false)}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={creating}
+                onClick={() => { setCreateModalOpen(false); setAiWarning(false); setImportError(null); }}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={handleConfirmCreate}
-                disabled={creating || !createTopic.trim()}
+                onClick={() => setAiWarning(true)}
+                disabled={!createTopic.trim()}
                 className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {creating ? "Creating…" : "Confirm"}
+                Confirm
+              </button>
+            </div>
+
+            {/* Manual import divider */}
+            <div className="my-5 flex items-center gap-3">
+              <hr className="flex-1 border-slate-200" />
+              <span className="text-xs text-slate-400">or</span>
+              <hr className="flex-1 border-slate-200" />
+            </div>
+
+            {/* Manual import section */}
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium text-slate-700">Manual import from JSON</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Choose a local <code className="rounded bg-slate-100 px-1">.json</code> file containing a valid task package. It will be added to the task list immediately.
+                </p>
+              </div>
+
+              {importError && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="mt-0.5 h-4 w-4 shrink-0 text-red-400">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+                  </svg>
+                  {importError}
+                </div>
+              )}
+
+              <input
+                ref={importFileRef}
+                type="file"
+                accept=".json,application/json"
+                className="hidden"
+                onChange={handleImportJson}
+              />
+              <button
+                type="button"
+                disabled={importing}
+                onClick={() => importFileRef.current?.click()}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {importing ? (
+                  "Importing…"
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                      <path d="M9.25 13.25a.75.75 0 0 0 1.5 0V4.636l2.955 3.129a.75.75 0 0 0 1.09-1.03l-4.25-4.5a.75.75 0 0 0-1.09 0l-4.25 4.5a.75.75 0 1 0 1.09 1.03L9.25 4.636v8.614z" />
+                      <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
+                    </svg>
+                    Choose JSON file to import
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -555,7 +691,7 @@ export default function AdminPage() {
       {langModalTaskId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
-            <h2 className="mb-1 text-lg font-semibold text-slate-800">Edit Target Language</h2>
+            <h2 className="mb-1 text-lg font-semibold text-slate-800">Edit Learner Language</h2>
             <p className="mb-4 text-sm text-slate-500">Select a language to open the translation editor.</p>
             <div className="flex flex-col gap-2">
               {TARGET_LANGUAGES.map((lang) => (
