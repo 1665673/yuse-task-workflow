@@ -15,6 +15,17 @@ interface AdminTaskRow {
 
 type AdminTab = "overview" | "tasks";
 
+const TARGET_LANGUAGES = [
+  { code: "cn", label: "Chinese", native: "简体中文" },
+  { code: "jp", label: "Japanese", native: "日本語" },
+  { code: "ko", label: "Korean", native: "한국어" },
+  { code: "es", label: "Spanish", native: "Español" },
+  { code: "fr", label: "French", native: "Français" },
+  { code: "de", label: "German", native: "Deutsch" },
+  { code: "pt", label: "Portuguese", native: "Português" },
+  { code: "ar", label: "Arabic", native: "العربية" },
+];
+
 export default function AdminPage() {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -41,6 +52,8 @@ export default function AdminPage() {
   const [createLanguage, setCreateLanguage] = useState("English");
   const [createTopic, setCreateTopic] = useState("");
   const [creating, setCreating] = useState(false);
+
+  const [langModalTaskId, setLangModalTaskId] = useState<string | null>(null);
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
@@ -347,10 +360,17 @@ export default function AdminPage() {
                           )}
                           <button
                             type="button"
+                            onClick={() => setLangModalTaskId(t.id)}
+                            className="rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100"
+                          >
+                            Language
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => router.push(`/tasks/${t.id}`)}
                             className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
                           >
-                            View
+                            Preview
                           </button>
                         </div>
                       </td>
@@ -528,6 +548,38 @@ export default function AdminPage() {
                 {creating ? "Creating…" : "Confirm"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Language selection modal */}
+      {langModalTaskId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+            <h2 className="mb-1 text-lg font-semibold text-slate-800">Edit Target Language</h2>
+            <p className="mb-4 text-sm text-slate-500">Select a language to open the translation editor.</p>
+            <div className="flex flex-col gap-2">
+              {TARGET_LANGUAGES.map((lang) => (
+                <button
+                  key={lang.code}
+                  type="button"
+                  onClick={() => {
+                    router.push(`/edit/task/${langModalTaskId}?target_language=${lang.code}`);
+                    setLangModalTaskId(null);
+                  }}
+                  className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3 text-left hover:border-violet-300 hover:bg-violet-50"
+                >
+                  <span className="font-medium text-slate-700">{lang.label}</span>
+                  <span className="text-sm text-slate-400">{lang.native}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setLangModalTaskId(null)}
+              className="mt-4 w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

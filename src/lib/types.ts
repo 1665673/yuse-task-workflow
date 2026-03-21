@@ -17,6 +17,8 @@ export interface TaskPackage {
   taskModel: TaskModel;
   phases: Phase[];
   translations: { [key: string]: Translation };
+  /** Target-language locale dicts: { [langCode]: { [originalText]: translation } } */
+  locales?: Record<string, Record<string, string>>;
 }
 
 export interface DialogueTurn {

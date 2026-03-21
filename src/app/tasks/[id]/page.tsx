@@ -29,6 +29,17 @@ const PHASE_NAMES = [
   "Phase 6",
 ];
 
+const TARGET_LANG_LABELS: Record<string, string> = {
+  cn: "Chinese (简体中文)",
+  jp: "Japanese (日本語)",
+  ko: "Korean (한국어)",
+  es: "Spanish (Español)",
+  fr: "French (Français)",
+  de: "German (Deutsch)",
+  pt: "Portuguese (Português)",
+  ar: "Arabic (العربية)",
+};
+
 export default function TaskDemoPage() {
   const { id } = useParams<{ id: string }>();
   const [task, setTask] = useState<TaskPackage | null>(null);
@@ -38,6 +49,8 @@ export default function TaskDemoPage() {
   const [error, setError] = useState<string | null>(null);
   const [questionAnswered, setQuestionAnswered] = useState(false);
   const [showPhaseSelector, setShowPhaseSelector] = useState(false);
+  /** Currently selected display locale; empty string = original. */
+  const [locale, setLocale] = useState<string>("");
 
   const { phaseGuidanceItems, flowItems } = task
     ? flattenTaskFlow(task)
@@ -160,9 +173,49 @@ export default function TaskDemoPage() {
     }
   };
 
+  // ── Translation helpers ────────────────────────────────────────────────────
+  const localeDict = locale && task?.locales?.[locale];
+  const tr = (text: string | undefined): string => {
+    if (!text) return text ?? "";
+    return localeDict ? (localeDict[text] ?? text) : text;
+  };
+  const translateGuidance = (g: { purpose: string; description: string }) => ({
+    ...g,
+    purpose: tr(g.purpose),
+    description: tr(g.description),
+  });
+  const translateQuestion = (q: import("@/lib/types").Question): import("@/lib/types").Question => ({
+    ...q,
+    stem: q.stem.text ? { ...q.stem, text: tr(q.stem.text) } : q.stem,
+    options: q.options.map((o) => (o.text ? { ...o, text: tr(o.text) } : o)),
+    hint: q.hint ? tr(q.hint) : q.hint,
+  });
+
+  // Available languages: those that exist in task.locales
+  const availableLocales = task?.locales ? Object.keys(task.locales) : [];
+
+  // Language switcher — shown whenever a task is loaded (always includes "Original")
+  const langSwitcher = task && (
+    <div className="fixed right-4 top-4 z-50">
+      <select
+        value={locale}
+        onChange={(e) => setLocale(e.target.value)}
+        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+      >
+        <option value="">Original</option>
+        {availableLocales.map((code) => (
+          <option key={code} value={code}>
+            {TARGET_LANG_LABELS[code] ?? code.toUpperCase()}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+
   if (screen === "welcome") {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
+        {langSwitcher}
         <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <h1 className="mb-2 text-2xl font-semibold text-slate-800">
             Language Learning Demo
@@ -241,11 +294,12 @@ export default function TaskDemoPage() {
 
     return (
       <main className="flex min-h-screen flex-col bg-slate-50 p-6">
+        {langSwitcher}
         <div className="mx-auto flex max-w-2xl flex-1 flex-col">
           <h2 className="mb-4 text-xl font-semibold text-slate-800">
             Phase: {phase.type}
           </h2>
-          <GuidanceBlock guidance={phase.guidance} label="Phase guidance" />
+          <GuidanceBlock guidance={translateGuidance(phase.guidance)} label="Phase guidance" />
           <div className="mt-8 flex justify-end">
             <button
               type="button"
@@ -269,11 +323,12 @@ export default function TaskDemoPage() {
 
     return (
       <main className="flex min-h-screen flex-col bg-slate-50 p-6">
+        {langSwitcher}
         <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
           {showStepGuidance && (
             <div className="mb-4">
               <GuidanceBlock
-                guidance={step.guidance!}
+                guidance={translateGuidance(step.guidance!)}
                 label={`Step: ${step.id}`}
               />
             </div>
@@ -282,7 +337,7 @@ export default function TaskDemoPage() {
           {showQuestionGuidance && item.kind === "question" && (
             <div className="mb-4">
               <GuidanceBlock
-                guidance={item.question.guidance!}
+                guidance={translateGuidance(item.question.guidance!)}
                 label="Question guidance"
               />
             </div>
@@ -315,13 +370,13 @@ export default function TaskDemoPage() {
                   {entry.step.guidance?.description && (
                     <div className="space-y-1">
                       <p className="text-sm font-semibold text-slate-500">任务概述</p>
-                      <p className="text-slate-700 leading-relaxed">{entry.step.guidance.description}</p>
+                      <p className="text-slate-700 leading-relaxed">{tr(entry.step.guidance.description)}</p>
                     </div>
                   )}
                   {entry.step.guidance?.purpose && (
                     <div className="space-y-1">
                       <p className="text-sm font-semibold text-slate-500">学习目标</p>
-                      <p className="text-slate-700 leading-relaxed">{entry.step.guidance.purpose}</p>
+                      <p className="text-slate-700 leading-relaxed">{tr(entry.step.guidance.purpose)}</p>
                     </div>
                   )}
                   <div className="mt-2">
@@ -330,7 +385,7 @@ export default function TaskDemoPage() {
                       onClick={handleFlowContinue}
                       className="w-full rounded-lg bg-blue-600 px-6 py-3 font-medium text-white transition-colors hover:bg-blue-700"
                     >
-                      {entry.step.callToActionText || "Start"}
+                      {tr(entry.step.callToActionText) || "Start"}
                     </button>
                   </div>
                 </div>
@@ -344,7 +399,7 @@ export default function TaskDemoPage() {
                 </p>
                 <QuestionRenderer
                   key={`flow-${flowIndex}`}
-                  question={item.question}
+                  question={translateQuestion(item.question)}
                   taskModel={task.taskModel}
                   onAnswer={() => setQuestionAnswered(true)}
                 />
@@ -422,6 +477,7 @@ export default function TaskDemoPage() {
   if (screen === "complete") {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
+        {langSwitcher}
         <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <h1 className="mb-2 text-2xl font-semibold text-slate-800">
             Task Complete

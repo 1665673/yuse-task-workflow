@@ -1841,7 +1841,10 @@ export default function TaskEditPage() {
         if (!res.ok) throw new Error("Failed to load task");
         const data = (await res.json()) as TaskPackage;
         setTask(data);
-        setTranslations({});
+        // Seed translations from an existing locale if one is already saved.
+        setTranslations(
+          isTargetMode ? (data.locales?.[targetLanguage] ?? {}) : {}
+        );
       } catch (e) {
         setError(e instanceof Error ? e.message : "Unknown error");
       } finally {
@@ -1849,7 +1852,7 @@ export default function TaskEditPage() {
       }
     };
     load();
-  }, [id]);
+  }, [id, isTargetMode, targetLanguage]);
 
   const handleCopyJson = () => {
     if (!task) return;
@@ -1866,12 +1869,23 @@ export default function TaskEditPage() {
     setSaving(true);
     setSaveMsg(null);
     try {
+      const payload = isTargetMode
+        ? {
+            ...task,
+            locales: {
+              ...(task.locales ?? {}),
+              [targetLanguage]: translations,
+            },
+          }
+        : task;
       const res = await fetch(`/api/tasks/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(task),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Save failed");
+      // Update local task state so the newly saved locales are reflected.
+      if (isTargetMode) setTask(payload);
       setSaveMsg("Saved");
       setTimeout(() => setSaveMsg(null), 2000);
     } catch (e) {
@@ -1987,16 +2001,14 @@ export default function TaskEditPage() {
             >
               {isTargetMode ? "Copy Translations" : "Copy JSON"}
             </button>
-            {!isTargetMode && (
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={!task || saving}
-                className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving ? "Saving…" : "Save"}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!task || saving}
+              className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
           </div>
         </header>
 
