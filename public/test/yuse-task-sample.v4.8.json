@@ -1,7 +1,7 @@
 {
   "version": "4.8",
-  "id": "task-logo-customization-required-assets-001",
-  "title": "Logo Customization – Prompt-only Assets",
+  "id": "task-logo-001",
+  "title": "Logo Customization",
   "description": "",
   "taskModelLanguage": "en",
   "nativeLanguage": "zh-CN",
@@ -691,7 +691,7 @@
           "type": "phase1_task_entry",
           "callToActionText": "我明白了，开始学习",
           "guidance": {
-            "purpose": "介绍任务背景",
+            "purpose": "讨论商标位置和尺寸要求",
             "description": "你将扮演义乌外贸商家，与海外买家沟通定制Logo。\n你需要澄清细节、报价并确认交付时间。\n完成后会有评分与改进建议。"
           }
         }

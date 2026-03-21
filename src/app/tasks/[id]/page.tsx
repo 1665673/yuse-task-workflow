@@ -7,6 +7,7 @@ import {
   flattenTaskFlow,
   type FlowItem,
   type PhaseGuidanceItem,
+  type Phase1EntryItem,
 } from "@/lib/task-utils";
 import { GuidanceBlock } from "@/components/GuidanceBlock";
 import { QuestionRenderer } from "@/components/QuestionRenderer";
@@ -263,7 +264,7 @@ export default function TaskDemoPage() {
     const item = flowItems[flowIndex];
     const { step, phaseIndex, stepIndex } = item;
 
-    const showStepGuidance = step.guidance;
+    const showStepGuidance = step.guidance && item.kind !== "phase1_entry";
     const showQuestionGuidance = item.kind === "question" && item.question.guidance;
 
     return (
@@ -288,6 +289,53 @@ export default function TaskDemoPage() {
           )}
 
           <div className="flex-1 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            {item.kind === "phase1_entry" && (() => {
+              const entry = item as Phase1EntryItem;
+              return (
+                <div className="flex flex-col gap-5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Phase 1 — Entry</p>
+                  {(() => {
+                    const imgUrl = entry.step.thumbnail
+                      ? task.taskModel.assets.images?.[entry.step.thumbnail]?.url
+                      : undefined;
+                    return imgUrl ? (
+                      <div className="aspect-square w-full overflow-hidden rounded-xl">
+                        <img
+                          src={imgUrl}
+                          alt="Task thumbnail"
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="aspect-square w-full flex items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50">
+                        <p className="text-sm text-slate-400">task thumbnail not found</p>
+                      </div>
+                    );
+                  })()}
+                  {entry.step.guidance?.description && (
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-slate-500">任务概述</p>
+                      <p className="text-slate-700 leading-relaxed">{entry.step.guidance.description}</p>
+                    </div>
+                  )}
+                  {entry.step.guidance?.purpose && (
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-slate-500">学习目标</p>
+                      <p className="text-slate-700 leading-relaxed">{entry.step.guidance.purpose}</p>
+                    </div>
+                  )}
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={handleFlowContinue}
+                      className="w-full rounded-lg bg-blue-600 px-6 py-3 font-medium text-white transition-colors hover:bg-blue-700"
+                    >
+                      {entry.step.callToActionText || "Start"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
             {item.kind === "question" && (
               <>
                 <p className="mb-4 text-sm text-slate-500">
@@ -353,7 +401,7 @@ export default function TaskDemoPage() {
             )}
           </div>
 
-          {/* Continue button - for question items always at bottom; phase4/5/6 have Continue inside their view */}
+          {/* Continue button — question items only; all other kinds handle it internally */}
           {item.kind === "question" && (
             <div className="mt-6 flex justify-end">
               <button

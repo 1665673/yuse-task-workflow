@@ -124,6 +124,7 @@ export interface BaseStep {
 export interface Phase1EntryStep extends BaseStep {
   type: "phase1_task_entry";
   callToActionText: string;
+  thumbnail?: string;
   entryQuestions?: Question[];
 }
 

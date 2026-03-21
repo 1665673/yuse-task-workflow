@@ -795,6 +795,15 @@ function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm md:col-span-2">
+          <span className="font-medium text-slate-700">Thumbnail</span>
+          <AssetSelect
+            value={step.thumbnail}
+            assetType="image"
+            options={taskImageAssets(task)}
+            onChange={(id) => updateStep({ ...step, thumbnail: id })}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm md:col-span-2">
           <span className="font-medium text-slate-700">Task purpose</span>
           <textarea
             value={step.guidance?.purpose ?? ""}

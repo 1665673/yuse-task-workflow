@@ -4,11 +4,20 @@
 
 import type { Phase, Step, Question, TaskPackage } from "./types";
 import type {
+  Phase1EntryStep,
   Phase4SubtasksStep,
   Phase5PhrasesStep,
   Phase5SentencesStep,
   Phase6RoleplayStep,
 } from "./types";
+
+export interface Phase1EntryItem {
+  kind: "phase1_entry";
+  phaseIndex: number;
+  stepIndex: number;
+  step: Phase1EntryStep;
+  phase: Phase;
+}
 
 export interface QuestionItem {
   kind: "question";
@@ -85,6 +94,7 @@ export interface Phase5SpeakPracticeItem {
 }
 
 export type FlowItem =
+  | Phase1EntryItem
   | QuestionItem
   | Phase4SubtaskItem
   | Phase5SentenceItem
@@ -284,6 +294,21 @@ export function flattenTaskFlow(task: TaskPackage): {
               phase,
             });
           });
+        });
+        return;
+      }
+
+      // Phase 1 entry: always add an entry card, then any optional questions
+      if (step.type === "phase1_task_entry") {
+        flowItems.push({
+          kind: "phase1_entry",
+          phaseIndex,
+          stepIndex,
+          step: step as Phase1EntryStep,
+          phase,
+        });
+        (step.entryQuestions ?? []).forEach((question, questionIndex) => {
+          flowItems.push({ kind: "question", phaseIndex, stepIndex, questionIndex, question, step, phase });
         });
         return;
       }
