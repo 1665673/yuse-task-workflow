@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import type {
   Question,
   TaskPackage,
@@ -34,6 +34,84 @@ function findPhase(task: TaskPackage | null, type: string): { phase: Phase | nul
   if (!task) return { phase: null, index: -1 };
   const index = task.phases.findIndex((p) => p.type === type);
   return { phase: index >= 0 ? task.phases[index] : null, index };
+}
+
+// ── Target-language mode context & helpers ────────────────────────────────────
+
+interface TargetLangCtx {
+  isTargetMode: boolean;
+  targetLanguage: string;
+  /** Flat dict: { [originalText]: translation } — the sole output of target-language mode. */
+  translations: Record<string, string>;
+  setTranslation: (key: string, value: string) => void;
+}
+
+const TargetLangContext = createContext<TargetLangCtx>({
+  isTargetMode: false,
+  targetLanguage: "",
+  translations: {},
+  setTranslation: () => {},
+});
+
+interface TLInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "className"> {
+  className?: string;
+}
+
+/**
+ * In target-language mode: shows the original text (from `value`) in a grey box,
+ * then renders a separate input driven by the translations dict.
+ * The `value` prop serves as both the display original AND the dict key.
+ * Outside target mode it is a plain <input>.
+ */
+function TLInput({ className, ...props }: TLInputProps) {
+  const { isTargetMode, translations, setTranslation } = useContext(TargetLangContext);
+  const base = `rounded border border-slate-300 px-2 py-1 text-sm ${className ?? ""}`;
+  if (!isTargetMode) return <input className={base} {...props} />;
+
+  const key = typeof props.value === "string" ? props.value : "";
+  if (!key) return <input className={base} {...props} disabled />;
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-sm text-slate-400 select-none">
+        {key}
+      </span>
+      <input
+        className={base}
+        type={props.type}
+        placeholder="Translation…"
+        value={translations[key] ?? ""}
+        onChange={(e) => setTranslation(key, e.target.value)}
+      />
+    </div>
+  );
+}
+
+interface TLTextareaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "className"> {
+  className?: string;
+}
+
+/** Same semantics as TLInput but for <textarea>. */
+function TLTextarea({ className, ...props }: TLTextareaProps) {
+  const { isTargetMode, translations, setTranslation } = useContext(TargetLangContext);
+  const base = `rounded border border-slate-300 px-2 py-1 text-sm ${className ?? ""}`;
+  if (!isTargetMode) return <textarea className={base} {...props} />;
+
+  const key = typeof props.value === "string" ? props.value : "";
+  if (!key) return <textarea className={base} {...props} disabled />;
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-sm text-slate-400 whitespace-pre-wrap select-none">
+        {key}
+      </span>
+      <textarea
+        className={base}
+        rows={props.rows}
+        placeholder="Translation…"
+        value={translations[key] ?? ""}
+        onChange={(e) => setTranslation(key, e.target.value)}
+      />
+    </div>
+  );
 }
 
 // ── Shared asset types & helpers ─────────────────────────────────────────────
@@ -192,6 +270,7 @@ interface QuestionListEditorProps {
 }
 
 function QuestionListEditor({ questions, onChange, imageAssets, audioAssets }: QuestionListEditorProps) {
+  const { isTargetMode } = useContext(TargetLangContext);
   const updateQuestion = (idx: number, next: Question) => {
     const copy = [...questions];
     copy[idx] = next;
@@ -229,9 +308,11 @@ function QuestionListEditor({ questions, onChange, imageAssets, audioAssets }: Q
           {/* Header */}
           <div className="flex items-center justify-between">
             <p className="font-medium text-slate-800">Question {idx + 1}</p>
-            <button type="button" onClick={() => removeQuestion(idx)} className="text-sm text-red-600 hover:underline">
-              Remove
-            </button>
+            {!isTargetMode && (
+              <button type="button" onClick={() => removeQuestion(idx)} className="text-sm text-red-600 hover:underline">
+                Remove
+              </button>
+            )}
           </div>
 
           {/* Type + Guidance */}
@@ -240,8 +321,9 @@ function QuestionListEditor({ questions, onChange, imageAssets, audioAssets }: Q
               <span className="font-medium text-slate-700">Type</span>
               <select
                 value={q.type}
+                disabled={isTargetMode}
                 onChange={(e) => changeType(idx, e.target.value as Question["type"])}
-                className="rounded border border-slate-300 px-2 py-1 text-sm"
+                className="rounded border border-slate-300 px-2 py-1 text-sm disabled:bg-slate-50 disabled:text-slate-500"
               >
                 <option value="text_text">Stem as text, Options as text</option>
                 <option value="text_image">Stem as text, Options as image</option>
@@ -284,11 +366,10 @@ function QuestionListEditor({ questions, onChange, imageAssets, audioAssets }: Q
             {q.type !== "audio_text" ? (
               <label className="flex flex-col gap-1 text-sm">
                 <span className="text-slate-600">Text</span>
-                <input
+                <TLInput
                   type="text"
                   value={q.stem.text ?? ""}
                   onChange={(e) => updateQuestion(idx, { ...q, stem: { text: e.target.value } })}
-                  className="rounded border border-slate-300 px-2 py-1 text-sm"
                 />
               </label>
             ) : (
@@ -330,12 +411,14 @@ function QuestionListEditor({ questions, onChange, imageAssets, audioAssets }: Q
                 <div key={oIdx} className="space-y-1.5 rounded border border-slate-200 bg-slate-50 p-2">
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={isCorrect} onChange={toggleCorrect} className="h-4 w-4" />
+                      <input type="checkbox" checked={isCorrect} onChange={toggleCorrect} disabled={isTargetMode} className="h-4 w-4" />
                       <span className="font-medium text-slate-700">Correct</span>
                     </label>
-                    <button type="button" onClick={removeOpt} className="text-xs text-red-600 hover:underline">
-                      Remove
-                    </button>
+                    {!isTargetMode && (
+                      <button type="button" onClick={removeOpt} className="text-xs text-red-600 hover:underline">
+                        Remove
+                      </button>
+                    )}
                   </div>
                   {q.type === "text_image" ? (
                     <AssetSelect
@@ -345,12 +428,12 @@ function QuestionListEditor({ questions, onChange, imageAssets, audioAssets }: Q
                       onChange={(id) => updateOpt({ imageAssetId: id })}
                     />
                   ) : (
-                    <input
+                    <TLInput
                       type="text"
                       placeholder="Option text"
                       value={opt.text ?? ""}
                       onChange={(e) => updateOpt({ text: e.target.value })}
-                      className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                      className="w-full"
                     />
                   )}
                   <input
@@ -363,38 +446,41 @@ function QuestionListEditor({ questions, onChange, imageAssets, audioAssets }: Q
                 </div>
               );
             })}
-            <button
-              type="button"
-              onClick={() => {
-                const newOpt = q.type === "text_image" ? {} : { text: "" };
-                updateQuestion(idx, { ...q, options: [...q.options, newOpt] });
-              }}
-              className="text-sm text-blue-600 hover:underline"
-            >
-              Add option
-            </button>
+            {!isTargetMode && (
+              <button
+                type="button"
+                onClick={() => {
+                  const newOpt = q.type === "text_image" ? {} : { text: "" };
+                  updateQuestion(idx, { ...q, options: [...q.options, newOpt] });
+                }}
+                className="text-sm text-blue-600 hover:underline"
+              >
+                Add option
+              </button>
+            )}
           </div>
 
           {/* Hint */}
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium text-slate-700">Hint (optional)</span>
-            <input
+            <TLInput
               type="text"
               value={q.hint ?? ""}
               onChange={(e) => updateQuestion(idx, { ...q, hint: e.target.value || undefined })}
-              className="rounded border border-slate-300 px-2 py-1 text-sm"
             />
           </label>
         </div>
       ))}
 
-      <button
-        type="button"
-        onClick={addQuestion}
-        className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-      >
-        Add question
-      </button>
+      {!isTargetMode && (
+        <button
+          type="button"
+          onClick={addQuestion}
+          className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Add question
+        </button>
+      )}
     </div>
   );
 }
@@ -634,6 +720,7 @@ function AssetSection({ label, assetType, items, onChange }: AssetSectionProps) 
 }
 
 function AssetsEditor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
+  const { isTargetMode } = useContext(TargetLangContext);
   const { assets } = task.taskModel;
 
   const toItems = (dict: Record<string, { prompt?: string; url?: string }>): AssetItem[] =>
@@ -664,6 +751,25 @@ function AssetsEditor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
       ...task,
       taskModel: { ...task.taskModel, assets: { ...assets, audios: toDict(next) } },
     });
+
+  if (isTargetMode) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0">
+            <path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z" />
+            <path fillRule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41zM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0z" clipRule="evenodd" />
+          </svg>
+          Assets are view-only in target language mode.
+        </div>
+        <div className="pointer-events-none opacity-60 space-y-8">
+          <AssetSection label="Images" assetType="image" items={imagesArr} onChange={() => {}} />
+          <hr className="border-slate-200" />
+          <AssetSection label="Audios" assetType="audio" items={audiosArr} onChange={() => {}} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -805,7 +911,7 @@ function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
         </label>
         <label className="flex flex-col gap-1 text-sm md:col-span-2">
           <span className="font-medium text-slate-700">Task purpose</span>
-          <textarea
+          <TLTextarea
             value={step.guidance?.purpose ?? ""}
             onChange={(e) =>
               updateStep({
@@ -814,12 +920,11 @@ function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
               })
             }
             rows={3}
-            className="rounded border border-slate-300 px-2 py-1 text-sm"
           />
         </label>
         <label className="flex flex-col gap-1 text-sm md:col-span-2">
           <span className="font-medium text-slate-700">Task description</span>
-          <textarea
+          <TLTextarea
             value={step.guidance?.description ?? ""}
             onChange={(e) =>
               updateStep({
@@ -828,16 +933,14 @@ function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
               })
             }
             rows={3}
-            className="rounded border border-slate-300 px-2 py-1 text-sm"
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium text-slate-700">Button text</span>
-          <input
+          <TLInput
             type="text"
             value={step.callToActionText}
             onChange={(e) => updateStep({ ...step, callToActionText: e.target.value })}
-            className="rounded border border-slate-300 px-2 py-1 text-sm"
           />
         </label>
       </div>
@@ -864,7 +967,7 @@ function Phase2Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
       <div className="grid gap-4 md:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium text-slate-700">Step guidance purpose</span>
-          <input
+          <TLInput
             type="text"
             value={step.guidance?.purpose ?? ""}
             onChange={(e) =>
@@ -873,12 +976,11 @@ function Phase2Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                 guidance: { ...(step.guidance ?? { description: "" }), purpose: e.target.value },
               })
             }
-            className="rounded border border-slate-300 px-2 py-1 text-sm"
           />
         </label>
         <label className="flex flex-col gap-1 text-sm md:col-span-2">
           <span className="font-medium text-slate-700">Step guidance description</span>
-          <textarea
+          <TLTextarea
             value={step.guidance?.description ?? ""}
             onChange={(e) =>
               updateStep({
@@ -887,7 +989,6 @@ function Phase2Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
               })
             }
             rows={3}
-            className="rounded border border-slate-300 px-2 py-1 text-sm"
           />
         </label>
       </div>
@@ -907,7 +1008,7 @@ function Phase2Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
 
 function Phase3Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
   const { phase, index } = findPhase(task, "phase3");
-  if (!phase) return <p className="text-sm text-slate-500">Phase \"phase3\" not found.</p>;
+  if (!phase) return <p className="text-sm text-slate-500">Phase "phase3" not found.</p>;
 
   const updatePhase = (nextPhase: Phase) => {
     const phases = [...task.phases];
@@ -1265,7 +1366,7 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
 
 function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
   const { phase, index } = findPhase(task, "reinforcement");
-  if (!phase) return <p className="text-sm text-slate-500">Phase \"reinforcement\" not found.</p>;
+  if (!phase) return <p className="text-sm text-slate-500">Phase "reinforcement" not found.</p>;
 
   const updatePhase = (nextPhase: Phase) => {
     const phases = [...task.phases];
@@ -1714,12 +1815,21 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
 export default function TaskEditPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const targetLanguage = searchParams.get("target_language") ?? "";
+  const isTargetMode = !!targetLanguage;
+
   const [task, setTask] = useState<TaskPackage | null>(null);
+  /** Flat translation dict: { [originalText]: translation } — the output of target-language mode. */
+  const [translations, setTranslations] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("info");
+
+  const setTranslation = (key: string, value: string) =>
+    setTranslations((prev) => ({ ...prev, [key]: value }));
 
   useEffect(() => {
     if (!id) return;
@@ -1731,6 +1841,7 @@ export default function TaskEditPage() {
         if (!res.ok) throw new Error("Failed to load task");
         const data = (await res.json()) as TaskPackage;
         setTask(data);
+        setTranslations({});
       } catch (e) {
         setError(e instanceof Error ? e.message : "Unknown error");
       } finally {
@@ -1742,7 +1853,9 @@ export default function TaskEditPage() {
 
   const handleCopyJson = () => {
     if (!task) return;
-    const json = JSON.stringify(task, null, 2);
+    const json = isTargetMode
+      ? JSON.stringify(translations, null, 2)
+      : JSON.stringify(task, null, 2);
     navigator.clipboard
       .writeText(json)
       .catch(() => alert("Failed to copy JSON to clipboard"));
@@ -1825,8 +1938,21 @@ export default function TaskEditPage() {
   };
 
   return (
+    <TargetLangContext.Provider value={{ isTargetMode, targetLanguage, translations, setTranslation }}>
     <main className="flex flex-col bg-slate-50 p-4 sm:p-6">
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col space-y-4">
+        {isTargetMode && (
+          <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0 text-amber-500">
+              <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" clipRule="evenodd" />
+            </svg>
+            <span>
+              <strong>Target language mode:</strong> <span className="font-mono uppercase">{targetLanguage}</span>
+              {" — "}original text is shown above each field in grey. Edit the translation below.
+            </span>
+          </div>
+        )}
+
         <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -1844,7 +1970,7 @@ export default function TaskEditPage() {
             <h1 className="text-2xl font-semibold text-slate-900">Edit Task</h1>
             <p className="text-sm text-slate-600">
               Edit the sample task JSON through structured phase editors. Changes are local in the browser; copy
-              the JSON when you're done.
+              the JSON when you&apos;re done.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1859,16 +1985,18 @@ export default function TaskEditPage() {
               disabled={!task}
               className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Copy JSON
+              {isTargetMode ? "Copy Translations" : "Copy JSON"}
             </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!task || saving}
-              className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
+            {!isTargetMode && (
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={!task || saving}
+                className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+            )}
           </div>
         </header>
 
@@ -1923,6 +2051,7 @@ export default function TaskEditPage() {
         )}
       </div>
     </main>
+    </TargetLangContext.Provider>
   );
 }
 
