@@ -659,10 +659,10 @@
           "prompt": "TTS voice: neutral, US English. Speak: 'Absolutely. I will confirm the specs and share the final quote.'"
         },
         "aud_157c2d52e6": {
-          "prompt": "朗读单词：logo（清晰自然语速）"
+          "prompt": "TTS voice: neutral, US English. Speak: 'logo'"
         },
         "aud_9b4af96f71": {
-          "prompt": "朗读单词：customize（清晰自然语速）"
+          "prompt": "TTS voice: neutral, US English. Speak: 'customize'"
         }
       }
     },
@@ -689,10 +689,10 @@
         {
           "id": "phase1_entry",
           "type": "phase1_task_entry",
-          "callToActionText": "我明白了，开始学习",
+          "callToActionText": "I understand, let's start",
           "guidance": {
-            "purpose": "讨论商标位置和尺寸要求",
-            "description": "你将扮演义乌外贸商家，与海外买家沟通定制Logo。\n你需要澄清细节、报价并确认交付时间。\n完成后会有评分与改进建议。"
+            "purpose": "Discuss logo placement, size, and design requirements",
+            "description": "You will play the role of a Yiwu foreign trade seller communicating with an overseas buyer about customizing a logo.\nYou need to clarify the specs, provide a quote, and confirm the delivery timeline.\nAfter completion, you will receive a score and improvement suggestions."
           }
         }
       ]
@@ -1114,5 +1114,52 @@
       ]
     }
   ],
+  "locales": {
+    "cn": {
+      "I understand, let's start": "我明白了，开始学习",
+      "Discuss logo placement, size, and design requirements": "讨论商标位置、尺寸和设计要求",
+      "You will play the role of a Yiwu foreign trade seller communicating with an overseas buyer about customizing a logo.\nYou need to clarify the specs, provide a quote, and confirm the delivery timeline.\nAfter completion, you will receive a score and improvement suggestions.": "你将扮演义乌外贸商家，与海外买家沟通定制Logo。\n你需要澄清规格、报价并确认交付时间。\n完成后会有评分与改进建议。",
+
+      "Which question best asks for the logo file?": "哪个问题最适合索取Logo文件？",
+      "Could you share the logo file?": "您能分享Logo文件吗？",
+      "Do you want a refund?": "您想要退款吗？",
+      "Ask for the file before discussing printing.": "在讨论印刷之前先索取文件。",
+
+      "What should you avoid with Middle East clients?": "与中东客户打交道时应该避免什么？",
+      "Rushing decisions": "仓促做决定",
+      "Confirming details carefully": "仔细确认细节",
+      "Confirming details prevents mistakes.": "确认细节可以防止错误。",
+
+      "What matters most in logo discussion?": "Logo洽谈中最重要的是什么？",
+      "Cultural meaning of colors": "颜色的文化含义",
+      "Only low price": "只关注低价",
+      "Cultural meaning is crucial for Middle East clients.": "颜色的文化含义对中东客户至关重要。",
+
+      "What ____ would you like?": "您喜欢什么____？",
+      "What ____ do you prefer?": "您更倾向于哪种____？",
+      "What ____ should we use for the logo?": "Logo应该使用什么____？",
+      "color": "颜色",
+      "price": "价格",
+      "quantity": "数量",
+      "timeline": "时间线",
+
+      "Is the design final?": "设计已经确定了吗？",
+      "We need 5,000 pieces.": "我们需要5000件。",
+      "We can revise the design if needed.": "如有需要，我们可以修改设计。",
+      "What's next?": "下一步是什么？",
+      "Have a nice day.": "祝您愉快。",
+      "What about the design?": "设计方面怎么样？",
+      "Please call me later.": "请稍后给我打电话。",
+
+      "We need to ___ the font style.": "我们需要___字体样式。",
+      "The final design should be ___.": "最终设计应该___。",
+      "Are we still able to ___ the style?": "我们还能___样式吗？",
+      "adjust": "调整",
+      "Start with letter a": "以字母a开头",
+
+      "logo": "logo（徽标）",
+      "customize": "定制"
+    }
+  },
   "translations": {}
 }
