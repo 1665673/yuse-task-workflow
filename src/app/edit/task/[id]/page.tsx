@@ -1825,7 +1825,7 @@ export default function TaskEditPage() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col bg-slate-50 p-4 sm:p-6">
+    <main className="flex flex-col bg-slate-50 p-4 sm:p-6">
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col space-y-4">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
