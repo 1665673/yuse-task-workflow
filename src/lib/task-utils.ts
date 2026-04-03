@@ -5,6 +5,7 @@
 import type { Phase, Step, Question, TaskPackage } from "./types";
 import type {
   Phase1EntryStep,
+  Phase4SubtaskEntry,
   Phase4SubtasksStep,
   Phase5PhrasesStep,
   Phase5SentencesStep,
@@ -342,4 +343,28 @@ export function newPhase4DistractorOptionId(existing: readonly { id?: string }[]
     const id = `opt_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
     if (!used.has(id)) return id;
   }
+}
+
+/** Unique subtask id for phase 4 (admin does not edit; stored in JSON). */
+export function newPhase4SubtaskId(used: ReadonlySet<string>): string {
+  for (;;) {
+    const id = `st_${crypto.randomUUID().replace(/-/g, "").slice(0, 10)}`;
+    if (!used.has(id)) return id;
+  }
+}
+
+/** Fills missing `subtaskId` values so every subtask row has a stable generated id. */
+export function ensurePhase4SubtaskIds(subtasks: Phase4SubtaskEntry[]): Phase4SubtaskEntry[] {
+  const taken = new Set<string>();
+  for (const s of subtasks) {
+    const t = s.subtaskId.trim();
+    if (t) taken.add(t);
+  }
+  return subtasks.map((s) => {
+    const t = s.subtaskId.trim();
+    if (t) return s;
+    const id = newPhase4SubtaskId(taken);
+    taken.add(id);
+    return { ...s, subtaskId: id };
+  });
 }

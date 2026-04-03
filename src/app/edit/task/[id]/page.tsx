@@ -18,7 +18,11 @@ import type {
   Phase5SentencesStep,
   Phase6RoleplayStep,
 } from "@/lib/types";
-import { newPhase4DistractorOptionId } from "@/lib/task-utils";
+import {
+  ensurePhase4SubtaskIds,
+  newPhase4DistractorOptionId,
+  newPhase4SubtaskId,
+} from "@/lib/task-utils";
 
 type TabKey =
   | "info"
@@ -1176,13 +1180,28 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
   if (!step) return <p className="text-sm text-slate-500">No phase4_subtasks step found.</p>;
 
   const updateStep = (next: Phase4SubtasksStep) => {
+    const withIds = { ...next, subtasks: ensurePhase4SubtaskIds(next.subtasks ?? []) };
     const phases = [...task.phases];
     const steps = [...phase.steps];
     const idx = steps.findIndex((s) => s.type === "phase4_subtasks");
-    steps[idx] = next;
+    steps[idx] = withIds;
     phases[index] = { ...phase, steps };
     setTask({ ...task, phases });
   };
+
+  useEffect(() => {
+    const sub = step.subtasks ?? [];
+    if (sub.every((s) => s.subtaskId.trim())) return;
+    const ensured = ensurePhase4SubtaskIds(sub);
+    if (JSON.stringify(ensured) === JSON.stringify(sub)) return;
+    const phases = [...task.phases];
+    const steps = [...phase.steps];
+    const idx = steps.findIndex((s) => s.type === "phase4_subtasks");
+    if (idx === -1) return;
+    steps[idx] = { ...step, subtasks: ensured };
+    phases[index] = { ...phase, steps };
+    setTask({ ...task, phases });
+  }, [task, phase, index, step]);
 
   const subtasks = step.subtasks ?? [];
   const dialogues = task.taskModel?.dialogues ?? [];
@@ -1197,8 +1216,13 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
       <div className="space-y-3">
         {subtasks.map((st, i) => (
           <div key={i} className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-            <div className="flex items-center justify-between">
-              <p className="font-medium text-slate-800">Subtask {i + 1}</p>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-medium text-slate-800">Subtask {i + 1}</p>
+                <p className="mt-0.5 font-mono text-xs text-slate-500" title="Stored on save; not editable">
+                  ID: {st.subtaskId || "…"}
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -1211,32 +1235,35 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
               </button>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2">
               <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-slate-700">Subtask ID</span>
-                <input
-                  type="text"
-                  value={st.subtaskId}
-                  onChange={(e) => {
-                    const next = [...subtasks];
-                    next[i] = { ...st, subtaskId: e.target.value };
-                    updateStep({ ...step, subtasks: next });
-                  }}
-                  className="rounded border border-slate-300 px-2 py-1 text-sm"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-slate-700">Dialogue ID</span>
-                <input
-                  type="text"
+                <span className="font-medium text-slate-700">Dialogue</span>
+                <select
                   value={st.dialogueId}
                   onChange={(e) => {
                     const next = [...subtasks];
                     next[i] = { ...st, dialogueId: e.target.value };
                     updateStep({ ...step, subtasks: next });
                   }}
-                  className="rounded border border-slate-300 px-2 py-1 text-sm"
-                />
+                  className="rounded border border-slate-300 bg-white px-2 py-1 text-sm"
+                >
+                  <option value="">— Select dialogue —</option>
+                  {dialogues.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.id}
+                      {d.subtaskId ? ` · ${d.subtaskId}` : ""}
+                      {d.turns?.length != null ? ` (${d.turns.length} turns)` : ""}
+                    </option>
+                  ))}
+                  {st.dialogueId && !dialogues.some((d) => d.id === st.dialogueId) ? (
+                    <option value={st.dialogueId}>
+                      {st.dialogueId} (not in task model — add dialogue or pick another)
+                    </option>
+                  ) : null}
+                </select>
+                {dialogues.length === 0 ? (
+                  <span className="text-xs text-amber-700">No dialogues in task model yet. Add them under Task model.</span>
+                ) : null}
               </label>
               <label className="flex flex-col gap-1 text-sm">
                 <span className="font-medium text-slate-700">Allowed roles (comma-separated)</span>
@@ -1263,7 +1290,7 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
 
               if (!st.dialogueId.trim()) {
                 return (
-                  <p className="text-sm text-slate-500">Enter a dialogue ID to preview turns and set distractors.</p>
+                  <p className="text-sm text-slate-500">Select a dialogue above to preview turns and set distractors.</p>
                 );
               }
               if (!dlg) {
@@ -1421,7 +1448,21 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
 
       <button
         type="button"
-        onClick={() => updateStep({ ...step, subtasks: [...subtasks, { subtaskId: "", allowedRoles: ["user"], dialogueId: "", dialogDistractors: [] }] })}
+        onClick={() => {
+          const taken = new Set(subtasks.map((s) => s.subtaskId.trim()).filter(Boolean));
+          updateStep({
+            ...step,
+            subtasks: [
+              ...subtasks,
+              {
+                subtaskId: newPhase4SubtaskId(taken),
+                allowedRoles: ["user"],
+                dialogueId: "",
+                dialogDistractors: [],
+              },
+            ],
+          });
+        }}
         className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
       >
         Add subtask
