@@ -13,7 +13,7 @@ interface Phase4SubtaskViewProps {
 
 export function Phase4SubtaskView({ item, task, onContinue }: Phase4SubtaskViewProps) {
   const { step, subtaskIndex } = item;
-  const subtask = step.subtasks[subtaskIndex];
+  const subtask = step.subtasks?.[subtaskIndex];
   if (!subtask) return null;
 
   const ourRole = subtask.allowedRoles[0] ?? "user";

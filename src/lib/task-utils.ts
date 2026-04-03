@@ -111,22 +111,37 @@ export interface PhaseGuidanceItem {
   phase: Phase;
 }
 
+function compactQuestions(list: unknown[]): Question[] {
+  return list.filter(
+    (q): q is Question =>
+      q != null && typeof q === "object" && "stem" in q && "options" in q
+  );
+}
+
 function getQuestionsFromStep(step: Step): Question[] {
+  let raw: unknown[] = [];
   switch (step.type) {
     case "phase1_task_entry":
-      return step.entryQuestions ?? [];
+      raw = step.entryQuestions ?? [];
+      break;
     case "phase2_warmup":
-      return step.warmupQuestions ?? [];
+      raw = step.warmupQuestions ?? [];
+      break;
     case "phase3_words":
-      return Object.values(step.wordQuestions ?? {}).flat();
+      raw = Object.values(step.wordQuestions ?? {}).flat();
+      break;
     case "phase3_phrases":
-      return Object.values(step.phraseQuestions ?? {}).flat();
+      raw = Object.values(step.phraseQuestions ?? {}).flat();
+      break;
     case "phase3_sentences":
-      return Object.values(step.sentenceQuestions ?? {}).flat();
+      raw = Object.values(step.sentenceQuestions ?? {}).flat();
+      break;
     case "phase5_words":
-      return Object.values(step.wordQuestions ?? {}).flat();
+      raw = Object.values(step.wordQuestions ?? {}).flat();
+      break;
     case "phase5_phrases":
-      return Object.values((step as Phase5PhrasesStep).phraseQuestions ?? {}).flat();
+      raw = Object.values((step as Phase5PhrasesStep).phraseQuestions ?? {}).flat();
+      break;
     case "phase4_subtasks":
     case "phase5_sentences":
     case "phase6_roleplay":
@@ -134,6 +149,7 @@ function getQuestionsFromStep(step: Step): Question[] {
     default:
       return [];
   }
+  return compactQuestions(raw);
 }
 
 /**
@@ -146,8 +162,10 @@ export function flattenTaskFlow(task: TaskPackage): {
   const phaseGuidanceItems: PhaseGuidanceItem[] = [];
   const flowItems: FlowItem[] = [];
 
-  task.phases.forEach((phase, phaseIndex) => {
-    phase.steps.forEach((step, stepIndex) => {
+  const tlts = task.taskModel?.tlts;
+
+  (task.phases ?? []).forEach((phase, phaseIndex) => {
+    (phase.steps ?? []).forEach((step, stepIndex) => {
       if (step.type === "phase4_subtasks") {
         const st = step as Phase4SubtasksStep;
         (st.subtasks ?? []).forEach((_, subtaskIndex) => {
@@ -205,9 +223,10 @@ export function flattenTaskFlow(task: TaskPackage): {
         const st = step as Phase5PhrasesStep;
         const phraseClozes = st.phraseClozes ?? {};
         Object.entries(phraseClozes).forEach(([phraseId, entry]) => {
+          if (!entry) return;
           if (entry.phraseDistractor) {
-            const phraseText = task.taskModel.tlts.phrases[phraseId] ?? phraseId;
-            const phraseTranslation = task.translations[phraseId]?.native ?? "";
+            const phraseText = tlts?.phrases?.[phraseId] ?? phraseId;
+            const phraseTranslation = task.translations?.[phraseId]?.native ?? "";
             flowItems.push({
               kind: "phase5_phrase_recognition",
               phaseIndex,
@@ -275,8 +294,8 @@ export function flattenTaskFlow(task: TaskPackage): {
         const wordQuestions = step.wordQuestions ?? {};
         Object.entries(wordQuestions).forEach(([wordId, questions]) => {
           // Get the word text from tlts
-          const wordText = task.taskModel.tlts.words[wordId] ?? wordId;
-          questions.forEach((question, questionIndex) => {
+          const wordText = tlts?.words?.[wordId] ?? wordId;
+          (questions ?? []).forEach((question, questionIndex) => {
             flowItems.push({
               kind: "question",
               phaseIndex,

@@ -20,12 +20,16 @@ interface QuestionRendererProps {
 }
 
 export function QuestionRenderer({ question, taskModel, onAnswer }: QuestionRendererProps) {
-  const { stem, options, correctOptionIndexes } = question;
+  const stem = question.stem;
+  const options = question.options ?? [];
+  const correctOptionIndexes = question.correctOptionIndexes ?? [];
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   // Shuffle options once per question; keep track of original index for correctness
   const { shuffledOptions, correctShuffledIndexes } = useMemo(() => {
-    const withIndex = options.map((opt, i) => ({ opt, originalIndex: i }));
+    const withIndex = options
+      .map((opt, i) => ({ opt, originalIndex: i }))
+      .filter((x) => x.opt != null);
     const shuffled = shuffle(withIndex);
     const correctShuffledIndexes = correctOptionIndexes.map(
       (orig) => shuffled.findIndex((e) => e.originalIndex === orig)
@@ -51,16 +55,16 @@ export function QuestionRenderer({ question, taskModel, onAnswer }: QuestionRend
     <div className="space-y-6">
       {/* Stem (题干) */}
       <div className="space-y-3">
-        {stem.text && (
+        {stem?.text && (
           <p className="text-lg leading-relaxed">{stem.text}</p>
         )}
-        {stem.imageAssetId && (
+        {stem?.imageAssetId && (
           <ImagePlaceholder
             taskModel={taskModel}
             imageAssetId={stem.imageAssetId}
           />
         )}
-        {stem.audioAssetId && (
+        {stem?.audioAssetId && (
           <AudioPlaceholder
             taskModel={taskModel}
             audioAssetId={stem.audioAssetId}

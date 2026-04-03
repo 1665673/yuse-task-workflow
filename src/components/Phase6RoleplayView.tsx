@@ -13,7 +13,7 @@ interface Phase6RoleplayViewProps {
 
 export function Phase6RoleplayView({ item, task, onContinue }: Phase6RoleplayViewProps) {
   const { step } = item;
-  const roleplay = step.roleplays[0];
+  const roleplay = step.roleplays?.[0];
   if (!roleplay) return null;
 
   const ourRole = roleplay.allowedRoles[0] ?? "user";

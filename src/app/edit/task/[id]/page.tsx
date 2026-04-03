@@ -25,6 +25,7 @@ import {
   syncPhase6RoleplayDifficultiesFromDialogues,
 } from "@/lib/task-utils";
 import { authJsonHeaders, authMultipartHeaders } from "@/lib/api";
+import { normalizeTaskPackage } from "@/lib/normalize-task-package";
 
 type TabKey =
   | "info"
@@ -2098,7 +2099,9 @@ export default function TaskEditPage() {
       try {
         const res = await fetch(`/api/tasks/${id}`);
         if (!res.ok) throw new Error("Failed to load task");
-        const data = (await res.json()) as TaskPackage;
+        const raw = await res.json();
+        const data = normalizeTaskPackage(raw);
+        if (!data) throw new Error("Invalid task JSON from API");
         setTask(data);
         // Seed translations from an existing locale if one is already saved.
         setTranslations(

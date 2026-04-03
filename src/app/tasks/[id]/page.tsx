@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { TaskPackage } from "@/lib/types";
+import { normalizeTaskPackage } from "@/lib/normalize-task-package";
 import {
   flattenTaskFlow,
   type FlowItem,
@@ -17,6 +18,9 @@ import { Phase5PhraseClozeView } from "@/components/Phase5PhraseClozeView";
 import { Phase6RoleplayView } from "@/components/Phase6RoleplayView";
 import { Phase5PhraseRecognitionView } from "@/components/Phase5PhraseRecognitionView";
 import { SpeakPracticeView } from "@/components/SpeakPracticeView";
+import { logTaskPreviewFetch, logTaskPreviewFlattenError } from "@/lib/task-preview-debug";
+
+const TASK_PREVIEW_BUILD_MARK = "[yuse task preview] page ready";
 
 type Screen = "welcome" | "loading" | "phase-guidance" | "question" | "complete";
 
@@ -53,23 +57,51 @@ export default function TaskDemoPage() {
   /** Currently selected display locale; empty string = original. */
   const [locale, setLocale] = useState<string>("");
 
-  const { phaseGuidanceItems, flowItems } = task
-    ? flattenTaskFlow(task)
-    : { phaseGuidanceItems: [] as PhaseGuidanceItem[], flowItems: [] as FlowItem[] };
+  const { phaseGuidanceItems, flowItems, flattenError } = useMemo(() => {
+    if (!task) {
+      return {
+        phaseGuidanceItems: [] as PhaseGuidanceItem[],
+        flowItems: [] as FlowItem[],
+        flattenError: null as string | null,
+      };
+    }
+    try {
+      const out = flattenTaskFlow(task);
+      return { ...out, flattenError: null };
+    } catch (err) {
+      logTaskPreviewFlattenError(task, err);
+      return {
+        phaseGuidanceItems: [] as PhaseGuidanceItem[],
+        flowItems: [] as FlowItem[],
+        flattenError: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }, [task]);
 
-  const getFirstFlowIndexForPhase = useCallback(
-    (phaseIdx: number) =>
-      flowItems.findIndex((item) => item.phaseIndex === phaseIdx),
-    [flowItems]
-  );
-
-  const fetchTask = async () => {
+  const fetchTask = useCallback(async () => {
     setScreen("loading");
     setError(null);
     try {
-      const res = await fetch(`/api/tasks/${id}`);
+      const requestUrl = `/api/tasks/${id}`;
+      const res = await fetch(requestUrl);
+      const raw = await res.json();
+      logTaskPreviewFetch("fetchTask (Start Task)", {
+        routeTaskId: id,
+        requestUrl,
+        status: res.status,
+        ok: res.ok,
+        raw,
+      });
       if (!res.ok) throw new Error("Failed to load task");
-      const data: TaskPackage = await res.json();
+      const data = normalizeTaskPackage(raw);
+      logTaskPreviewFetch("fetchTask (after normalize)", {
+        routeTaskId: id,
+        requestUrl,
+        normalized: data,
+      });
+      if (!data) {
+        throw new Error("Invalid task JSON (missing phases or wrong shape from API)");
+      }
       setTask(data);
 
       const { flowItems: items } = flattenTaskFlow(data);
@@ -87,16 +119,45 @@ export default function TaskDemoPage() {
       setError(e instanceof Error ? e.message : "Unknown error");
       setScreen("welcome");
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    console.warn(TASK_PREVIEW_BUILD_MARK);
+  }, []);
+
+  /** Visiting `/tasks/<id>` loads the task immediately (no need to click Start). */
+  useEffect(() => {
+    if (!id) return;
+    void fetchTask();
+  }, [id, fetchTask]);
+
+  const getFirstFlowIndexForPhase = useCallback(
+    (phaseIdx: number) =>
+      flowItems.findIndex((item) => item.phaseIndex === phaseIdx),
+    [flowItems]
+  );
 
   const jumpToPhase = async (phaseIdx: number) => {
     setShowPhaseSelector(false);
     setScreen("loading");
     setError(null);
     try {
-      const res = await fetch(`/api/tasks/${id}`);
+      const requestUrl = `/api/tasks/${id}`;
+      const res = await fetch(requestUrl);
+      const raw = await res.json();
+      logTaskPreviewFetch("jumpToPhase", {
+        routeTaskId: id,
+        requestUrl,
+        status: res.status,
+        ok: res.ok,
+        raw,
+      });
       if (!res.ok) throw new Error("Failed to load task");
-      const data: TaskPackage = await res.json();
+      const data = normalizeTaskPackage(raw);
+      logTaskPreviewFetch("jumpToPhase (after normalize)", { normalized: data });
+      if (!data) {
+        throw new Error("Invalid task JSON (missing phases or wrong shape from API)");
+      }
       setTask(data);
 
       const { flowItems: items } = flattenTaskFlow(data);
@@ -178,19 +239,25 @@ export default function TaskDemoPage() {
   const localeDict = locale && task?.locales?.[locale];
   const tr = (text: string | undefined): string => {
     if (!text) return text ?? "";
-    return localeDict ? (localeDict[text] ?? text) : text;
+    if (!localeDict || typeof localeDict !== "object" || Array.isArray(localeDict)) return text;
+    return (localeDict as Record<string, string>)[text] ?? text;
   };
   const translateGuidance = (g: { purpose: string; description: string }) => ({
     ...g,
     purpose: tr(g.purpose),
     description: tr(g.description),
   });
-  const translateQuestion = (q: import("@/lib/types").Question): import("@/lib/types").Question => ({
-    ...q,
-    stem: q.stem.text ? { ...q.stem, text: tr(q.stem.text) } : q.stem,
-    options: q.options.map((o) => (o.text ? { ...o, text: tr(o.text) } : o)),
-    hint: q.hint ? tr(q.hint) : q.hint,
-  });
+  const translateQuestion = (q: import("@/lib/types").Question): import("@/lib/types").Question => {
+    if (!q?.stem) {
+      console.warn("[yuse task preview] translateQuestion: missing stem");
+    }
+    return {
+      ...q,
+      stem: q.stem?.text ? { ...q.stem, text: tr(q.stem.text) } : q.stem,
+      options: (q.options ?? []).map((o) => (o?.text ? { ...o, text: tr(o.text) } : o)),
+      hint: q.hint ? tr(q.hint) : q.hint,
+    };
+  };
 
   // Available languages: those that exist in task.locales
   const availableLocales = task?.locales ? Object.keys(task.locales) : [];
@@ -300,6 +367,32 @@ export default function TaskDemoPage() {
       <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
         {backToAdmin}
         <div className="text-slate-600">Loading task...</div>
+      </main>
+    );
+  }
+
+  if (task && flattenError) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
+        {backToAdmin}
+        <div className="w-full max-w-lg rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-900 shadow-sm">
+          <p className="font-semibold text-red-950">Could not build task flow</p>
+          <p className="mt-2 font-mono text-xs text-red-800">{flattenError}</p>
+          <p className="mt-3 text-red-800">
+            Open DevTools → Console and filter by <code className="rounded bg-red-100 px-1">[yuse task preview]</code> for
+            the full task JSON and API response.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setTask(null);
+              setScreen("welcome");
+            }}
+            className="mt-4 rounded-lg border border-red-300 bg-white px-4 py-2 font-medium text-red-900 hover:bg-red-100"
+          >
+            Back
+          </button>
+        </div>
       </main>
     );
   }

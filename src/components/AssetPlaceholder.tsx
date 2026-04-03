@@ -15,7 +15,7 @@ export function ImagePlaceholder({
   taskModel: TaskModel;
   imageAssetId?: string;
 }) {
-  const asset = imageAssetId ? taskModel.assets.images[imageAssetId] : null;
+  const asset = imageAssetId ? taskModel.assets?.images?.[imageAssetId] : null;
   const hasUrl = asset?.url ?? asset?.base64;
 
   if (!asset || !hasUrl) {
@@ -42,7 +42,7 @@ export function AudioPlaceholder({
   taskModel: TaskModel;
   audioAssetId?: string;
 }) {
-  const asset = audioAssetId ? taskModel.assets.audios[audioAssetId] : null;
+  const asset = audioAssetId ? taskModel.assets?.audios?.[audioAssetId] : null;
   const hasUrl = asset?.url ?? asset?.base64;
 
   const handleClick = () => {
