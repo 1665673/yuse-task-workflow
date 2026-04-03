@@ -4,11 +4,13 @@
 
 import type { Phase, Step, Question, TaskPackage } from "./types";
 import type {
+  Dialogue,
   Phase1EntryStep,
   Phase4SubtaskEntry,
   Phase4SubtasksStep,
   Phase5PhrasesStep,
   Phase5SentencesStep,
+  Phase6RoleplayEntry,
   Phase6RoleplayStep,
 } from "./types";
 
@@ -366,5 +368,18 @@ export function ensurePhase4SubtaskIds(subtasks: Phase4SubtaskEntry[]): Phase4Su
     const id = newPhase4SubtaskId(taken);
     taken.add(id);
     return { ...s, subtaskId: id };
+  });
+}
+
+/** Keeps `difficulty` on each roleplay in sync with the selected dialogue in the task model. */
+export function syncPhase6RoleplayDifficultiesFromDialogues(
+  roleplays: Phase6RoleplayEntry[],
+  dialogues: Dialogue[]
+): Phase6RoleplayEntry[] {
+  return roleplays.map((rp) => {
+    if (!rp.dialogueId.trim()) return { ...rp, difficulty: "" };
+    const d = dialogues.find((x) => x.id === rp.dialogueId);
+    if (!d) return rp;
+    return { ...rp, difficulty: d.difficulty ?? "" };
   });
 }

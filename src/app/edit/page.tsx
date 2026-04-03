@@ -21,6 +21,7 @@ import {
   ensurePhase4SubtaskIds,
   newPhase4DistractorOptionId,
   newPhase4SubtaskId,
+  syncPhase6RoleplayDifficultiesFromDialogues,
 } from "@/lib/task-utils";
 
 type TabKey =
@@ -1044,6 +1045,24 @@ function Phase3Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
   );
 }
 
+/** Plus-in-circle — add hint for this dialogue turn (Phase 6). */
+function Phase4AddTurnIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M12 8.5v7M8.5 12h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
   const { phase, index } = findPhase(task, "subtask_learning");
   if (!phase) return <p className="text-sm text-slate-500">Phase \"subtask_learning\" not found.</p>;
@@ -1580,21 +1599,42 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
   const step = phase.steps.find((s) => s.type === "phase6_roleplay") as Phase6RoleplayStep | undefined;
   if (!step) return <p className="text-sm text-slate-500">No phase6_roleplay step found.</p>;
 
+  const dialogues = task.taskModel?.dialogues ?? [];
+
   const updateStep = (next: Phase6RoleplayStep) => {
+    const synced: Phase6RoleplayStep = {
+      ...next,
+      roleplays: syncPhase6RoleplayDifficultiesFromDialogues(next.roleplays ?? [], dialogues),
+    };
     const phases = [...task.phases];
     const steps = [...phase.steps];
     const idx = steps.findIndex((s) => s.type === "phase6_roleplay");
-    steps[idx] = next;
+    steps[idx] = synced;
     phases[index] = { ...phase, steps };
     setTask({ ...task, phases });
   };
+
+  useEffect(() => {
+    const dlgList = task.taskModel?.dialogues ?? [];
+    const r = step.roleplays ?? [];
+    const synced = syncPhase6RoleplayDifficultiesFromDialogues(r, dlgList);
+    if (JSON.stringify(synced) === JSON.stringify(r)) return;
+    const phases = [...task.phases];
+    const steps = [...phase.steps];
+    const idx = steps.findIndex((s) => s.type === "phase6_roleplay");
+    if (idx === -1) return;
+    steps[idx] = { ...step, roleplays: synced };
+    phases[index] = { ...phase, steps };
+    setTask({ ...task, phases });
+  }, [task, phase, index, step]);
 
   const roleplays = step.roleplays ?? [];
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-600">
-        Configure roleplay entries, linking each to a full-task dialogue and specifying learner hints.
+        Configure roleplay entries: pick a dialogue (difficulty comes from that dialogue), allowed roles, and learner
+        hints by turn index.
       </p>
       <div className="space-y-3">
         {roleplays.map((rp, i) => (
@@ -1614,30 +1654,53 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-slate-700">Dialogue ID</span>
-                <input
-                  type="text"
+                <span className="font-medium text-slate-700">Dialogue</span>
+                <select
                   value={rp.dialogueId}
                   onChange={(e) => {
+                    const id = e.target.value;
+                    const dlg = dialogues.find((d) => d.id === id);
                     const next = [...roleplays];
-                    next[i] = { ...rp, dialogueId: e.target.value };
+                    next[i] = {
+                      ...rp,
+                      dialogueId: id,
+                      difficulty: dlg?.difficulty ?? "",
+                    };
                     updateStep({ ...step, roleplays: next });
                   }}
-                  className="rounded border border-slate-300 px-2 py-1 text-sm"
-                />
+                  className="rounded border border-slate-300 bg-white px-2 py-1 text-sm"
+                >
+                  <option value="">— Select dialogue —</option>
+                  {dialogues.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.id}
+                      {d.scope ? ` · ${d.scope}` : ""}
+                      {d.difficulty ? ` · ${d.difficulty}` : ""}
+                      {d.turns?.length != null ? ` (${d.turns.length} turns)` : ""}
+                    </option>
+                  ))}
+                  {rp.dialogueId && !dialogues.some((d) => d.id === rp.dialogueId) ? (
+                    <option value={rp.dialogueId}>
+                      {rp.dialogueId} (not in task model — add dialogue or pick another)
+                    </option>
+                  ) : null}
+                </select>
+                {dialogues.length === 0 ? (
+                  <span className="text-xs text-amber-700">No dialogues in task model yet.</span>
+                ) : null}
               </label>
               <label className="flex flex-col gap-1 text-sm">
                 <span className="font-medium text-slate-700">Difficulty</span>
                 <input
                   type="text"
+                  readOnly
+                  disabled
                   value={rp.difficulty}
-                  onChange={(e) => {
-                    const next = [...roleplays];
-                    next[i] = { ...rp, difficulty: e.target.value };
-                    updateStep({ ...step, roleplays: next });
-                  }}
-                  className="rounded border border-slate-300 px-2 py-1 text-sm"
+                  placeholder="—"
+                  title="Taken from the selected dialogue in the task model"
+                  className="cursor-not-allowed rounded border border-slate-200 bg-slate-50 px-2 py-1 text-sm text-slate-600"
                 />
+                <span className="text-xs text-slate-500">From dialogue; edit under Task model dialogues.</span>
               </label>
               <label className="flex flex-col gap-1 text-sm">
                 <span className="font-medium text-slate-700">Allowed roles (comma-separated)</span>
@@ -1658,59 +1721,170 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
               </label>
             </div>
             <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-700">Hints by turn index</p>
-              {(rp.dialogHints ?? []).map((h, hIdx) => (
-                <div key={hIdx} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="number"
-                    value={h.index}
-                    onChange={(e) => {
-                      const hints = [...(rp.dialogHints ?? [])];
-                      hints[hIdx] = { ...h, index: Number(e.target.value) || 0 };
-                      const next = [...roleplays];
-                      next[i] = { ...rp, dialogHints: hints };
-                      updateStep({ ...step, roleplays: next });
-                    }}
-                    className="w-24 rounded border border-slate-300 px-2 py-1"
-                  />
-                  <input
-                    type="text"
-                    value={h.text}
-                    onChange={(e) => {
-                      const hints = [...(rp.dialogHints ?? [])];
-                      hints[hIdx] = { ...h, text: e.target.value };
-                      const next = [...roleplays];
-                      next[i] = { ...rp, dialogHints: hints };
-                      updateStep({ ...step, roleplays: next });
-                    }}
-                    className="flex-1 rounded border border-slate-300 px-2 py-1"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const hints = (rp.dialogHints ?? []).filter((_, idx) => idx !== hIdx);
-                      const next = [...roleplays];
-                      next[i] = { ...rp, dialogHints: hints };
-                      updateStep({ ...step, roleplays: next });
-                    }}
-                    className="text-xs text-red-600 hover:underline"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => {
-                  const hints = [...(rp.dialogHints ?? []), { index: 0, text: "" }];
-                  const next = [...roleplays];
-                  next[i] = { ...rp, dialogHints: hints };
-                  updateStep({ ...step, roleplays: next });
-                }}
-                className="text-sm text-blue-600 hover:underline"
-              >
-                Add hint
-              </button>
+              <p className="text-sm font-medium text-slate-700">Learner hints by turn</p>
+              {(() => {
+                const dlg = dialogues.find((d) => d.id === rp.dialogueId);
+                const turns = dlg?.turns ?? [];
+                const hints = rp.dialogHints ?? [];
+
+                if (!rp.dialogueId.trim()) {
+                  return (
+                    <p className="text-sm text-slate-500">Select a dialogue above to map hints to speak turns.</p>
+                  );
+                }
+                if (!dlg) {
+                  return (
+                    <p className="text-sm text-amber-700">
+                      No dialogue in task model with id &quot;{rp.dialogueId}&quot;. Fix the dialogue selection first.
+                    </p>
+                  );
+                }
+                if (turns.length === 0) {
+                  return <p className="text-sm text-slate-500">This dialogue has no turns.</p>;
+                }
+
+                const orphanEntries = hints
+                  .map((h, globalIdx) => ({ h, globalIdx }))
+                  .filter(({ h }) => h.index < 0 || h.index >= turns.length);
+
+                return (
+                  <div className="space-y-2">
+                    <p className="text-xs text-slate-500">
+                      Each line is one speak turn (index matches task JSON). Use + to attach a hint for that turn.
+                    </p>
+                    <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50/80 p-2">
+                      {turns.map((turn, turnIdx) => {
+                        const atTurn = hints
+                          .map((h, globalIdx) => ({ h, globalIdx }))
+                          .filter(({ h }) => h.index === turnIdx);
+                        const hasHints = atTurn.length > 0;
+
+                        return (
+                          <div
+                            key={turnIdx}
+                            className={`rounded-md border bg-white ${hasHints ? "border-violet-200 ring-1 ring-violet-100" : "border-slate-100"}`}
+                          >
+                            <div className="flex items-start gap-2 py-2 pl-2 pr-1">
+                              <span
+                                className="mt-0.5 w-7 shrink-0 text-right text-xs tabular-nums text-slate-400"
+                                title="Turn index"
+                              >
+                                {turnIdx}
+                              </span>
+                              <span className="mt-0.5 shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium uppercase text-slate-600">
+                                {turn.role}
+                              </span>
+                              <span className="min-w-0 flex-1 text-sm leading-snug text-slate-800">{turn.text}</span>
+                              {!hasHints && (
+                                <button
+                                  type="button"
+                                  title="Add hint for this turn"
+                                  aria-label={`Add hint for turn ${turnIdx}`}
+                                  onClick={() => {
+                                    const nextHints = [...hints, { index: turnIdx, text: "" }];
+                                    const nextRp = [...roleplays];
+                                    nextRp[i] = { ...rp, dialogHints: nextHints };
+                                    updateStep({ ...step, roleplays: nextRp });
+                                  }}
+                                  className="shrink-0 rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-violet-600"
+                                >
+                                  <Phase4AddTurnIcon />
+                                </button>
+                              )}
+                            </div>
+                            {hasHints && (
+                              <div className="space-y-2 border-t border-slate-100 bg-slate-50/90 p-2 text-sm">
+                                <p className="text-xs font-medium text-slate-600">Hints for turn {turnIdx}</p>
+                                {atTurn.map(({ h, globalIdx }) => (
+                                  <div key={globalIdx} className="flex items-start gap-2">
+                                    <input
+                                      type="text"
+                                      placeholder="Hint text"
+                                      value={h.text}
+                                      onChange={(e) => {
+                                        const nextHints = [...hints];
+                                        nextHints[globalIdx] = { ...h, text: e.target.value };
+                                        const nextRp = [...roleplays];
+                                        nextRp[i] = { ...rp, dialogHints: nextHints };
+                                        updateStep({ ...step, roleplays: nextRp });
+                                      }}
+                                      className="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const nextHints = hints.filter((_, idx) => idx !== globalIdx);
+                                        const nextRp = [...roleplays];
+                                        nextRp[i] = { ...rp, dialogHints: nextHints };
+                                        updateStep({ ...step, roleplays: nextRp });
+                                      }}
+                                      className="shrink-0 text-xs text-red-600 hover:underline"
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nextHints = [...hints, { index: turnIdx, text: "" }];
+                                    const nextRp = [...roleplays];
+                                    nextRp[i] = { ...rp, dialogHints: nextHints };
+                                    updateStep({ ...step, roleplays: nextRp });
+                                  }}
+                                  className="text-xs text-violet-600 hover:underline"
+                                >
+                                  Add another hint for this turn
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {orphanEntries.length > 0 ? (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50/90 p-3 text-sm">
+                        <p className="mb-2 font-medium text-amber-900">
+                          Hints with turn index outside this dialogue (remove or they stay in JSON)
+                        </p>
+                        <div className="space-y-2">
+                          {orphanEntries.map(({ h, globalIdx }) => (
+                            <div key={globalIdx} className="flex flex-wrap items-start gap-2">
+                              <span className="shrink-0 pt-1.5 font-mono text-xs text-amber-800">
+                                index {h.index}
+                              </span>
+                              <input
+                                type="text"
+                                value={h.text}
+                                onChange={(e) => {
+                                  const nextHints = [...hints];
+                                  nextHints[globalIdx] = { ...h, text: e.target.value };
+                                  const nextRp = [...roleplays];
+                                  nextRp[i] = { ...rp, dialogHints: nextHints };
+                                  updateStep({ ...step, roleplays: nextRp });
+                                }}
+                                className="min-w-[12rem] flex-1 rounded border border-amber-300/80 bg-white px-2 py-1"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextHints = hints.filter((_, idx) => idx !== globalIdx);
+                                  const nextRp = [...roleplays];
+                                  nextRp[i] = { ...rp, dialogHints: nextHints };
+                                  updateStep({ ...step, roleplays: nextRp });
+                                }}
+                                className="text-xs text-red-600 hover:underline"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         ))}
@@ -1723,7 +1897,7 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
             ...step,
             roleplays: [
               ...roleplays,
-              { allowedRoles: ["user"], dialogueId: "", difficulty: "a", dialogHints: [] },
+              { allowedRoles: ["user"], dialogueId: "", difficulty: "", dialogHints: [] },
             ],
           })
         }
