@@ -56,6 +56,8 @@ export default function TaskDemoPage() {
   const [showPhaseSelector, setShowPhaseSelector] = useState(false);
   /** Currently selected display locale; empty string = original. */
   const [locale, setLocale] = useState<string>("");
+  /** Resets after choosing a phase in the top-right "Jump to phase" control. */
+  const [phaseJumpValue, setPhaseJumpValue] = useState("");
 
   const { phaseGuidanceItems, flowItems, flattenError } = useMemo(() => {
     if (!task) {
@@ -275,13 +277,14 @@ export default function TaskDemoPage() {
     </button>
   );
 
-  // Language switcher — shown whenever a task is loaded (always includes "Original")
-  const langSwitcher = task && (
-    <div className="fixed right-4 top-4 z-50">
+  /** Language + phase jump — fixed top-right whenever a task is loaded */
+  const taskPreviewTools = task && (
+    <div className="fixed right-4 top-4 z-50 flex flex-col items-end gap-2">
       <select
         value={locale}
         onChange={(e) => setLocale(e.target.value)}
         className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+        aria-label="Display language"
       >
         <option value="">Original</option>
         {availableLocales.map((code) => (
@@ -290,6 +293,30 @@ export default function TaskDemoPage() {
           </option>
         ))}
       </select>
+      <div className="flex min-w-[11rem] flex-col gap-1.5 rounded-lg border-2 border-red-300 bg-white px-3 py-2 shadow-md">
+        <span className="text-xs font-bold leading-tight text-red-600">
+          Jump to phase — preview tool
+        </span>
+        <select
+          value={phaseJumpValue}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "") return;
+            const idx = Number(v);
+            setPhaseJumpValue("");
+            void jumpToPhase(idx);
+          }}
+          className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-medium text-slate-800 shadow-sm hover:border-slate-400"
+          aria-label="Jump to phase"
+        >
+          <option value="">Choose phase…</option>
+          {PHASE_NAMES.map((name, idx) => (
+            <option key={idx} value={idx}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 
@@ -297,7 +324,7 @@ export default function TaskDemoPage() {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
         {backToAdmin}
-        {langSwitcher}
+        {taskPreviewTools}
         <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <h1 className="mb-2 text-2xl font-semibold text-slate-800">
             Language Learning Demo
@@ -404,7 +431,7 @@ export default function TaskDemoPage() {
     return (
       <main className="flex min-h-screen flex-col bg-slate-50 p-6">
         {backToAdmin}
-        {langSwitcher}
+        {taskPreviewTools}
         <div className="mx-auto flex max-w-2xl flex-1 flex-col">
           <h2 className="mb-4 text-xl font-semibold text-slate-800">
             Phase: {phase.type}
@@ -434,7 +461,7 @@ export default function TaskDemoPage() {
     return (
       <main className="flex min-h-screen flex-col bg-slate-50 p-6">
         {backToAdmin}
-        {langSwitcher}
+        {taskPreviewTools}
         <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
           {showStepGuidance && (
             <div className="mb-4">
@@ -589,7 +616,7 @@ export default function TaskDemoPage() {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
         {backToAdmin}
-        {langSwitcher}
+        {taskPreviewTools}
         <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <h1 className="mb-2 text-2xl font-semibold text-slate-800">
             Task Complete

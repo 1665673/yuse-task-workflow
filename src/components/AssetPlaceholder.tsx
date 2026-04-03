@@ -45,7 +45,7 @@ export function AudioPlaceholder({
   const asset = audioAssetId ? taskModel.assets?.audios?.[audioAssetId] : null;
   const hasUrl = asset?.url ?? asset?.base64;
 
-  const handleClick = () => {
+  const play = () => {
     if (!asset || !hasUrl) {
       alert("audio does not exists");
       return;
@@ -54,11 +54,23 @@ export function AudioPlaceholder({
     audio.play().catch(console.error);
   };
 
+  /** Use a div, not a <button>, so this can sit inside option rows that are already <button>s (valid HTML + no hydration warning). */
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 transition-colors hover:bg-gray-100"
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={(e) => {
+        e.stopPropagation();
+        play();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          e.stopPropagation();
+          play();
+        }
+      }}
+      className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 transition-colors hover:bg-gray-100"
       aria-label="Play audio"
     >
       <svg
@@ -70,6 +82,6 @@ export function AudioPlaceholder({
         <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
       </svg>
       <span className="text-sm text-gray-700">Play audio</span>
-    </button>
+    </div>
   );
 }
