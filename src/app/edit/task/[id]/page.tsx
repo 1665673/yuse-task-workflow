@@ -26,6 +26,7 @@ import {
 } from "@/lib/task-utils";
 import { authJsonHeaders, authMultipartHeaders } from "@/lib/api";
 import { normalizeTaskPackage } from "@/lib/normalize-task-package";
+import { AudioRecordModal } from "@/components/AudioRecordModal";
 
 type TabKey =
   | "info"
@@ -598,6 +599,7 @@ interface AssetSectionProps {
 function AssetSection({ label, assetType, items, onChange }: AssetSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
+  const [recordModalIdx, setRecordModalIdx] = useState<number | null>(null);
 
   const prefix = assetType === "image" ? "img" : "aud";
   const accept = assetType === "image" ? "image/*" : "audio/*";
@@ -712,6 +714,16 @@ function AssetSection({ label, assetType, items, onChange }: AssetSectionProps) 
                     >
                       {isUploading ? "Uploading…" : "Upload"}
                     </button>
+                    {assetType === "audio" && (
+                      <button
+                        type="button"
+                        disabled={isUploading}
+                        onClick={() => setRecordModalIdx(idx)}
+                        className="shrink-0 rounded border border-slate-300 bg-white px-2 py-1 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Record
+                      </button>
+                    )}
                   </div>
                 </label>
               </div>
@@ -727,6 +739,17 @@ function AssetSection({ label, assetType, items, onChange }: AssetSectionProps) 
       >
         Add {assetType}
       </button>
+
+      {assetType === "audio" && recordModalIdx !== null && items[recordModalIdx] != null && (
+        <AudioRecordModal
+          assetId={items[recordModalIdx].id}
+          onClose={() => setRecordModalIdx(null)}
+          onSaved={(url) => {
+            updateItem(recordModalIdx, { url });
+            setRecordModalIdx(null);
+          }}
+        />
+      )}
     </div>
   );
 }
