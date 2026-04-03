@@ -16,6 +16,8 @@ interface AdminTaskRow {
   language: string;
   status: TaskStatus;
   createdAt: string; // ISO string
+  /** Present when API returns it (admin sees assignee). */
+  assignedReviewer?: string | null;
 }
 
 type AdminTab = "overview" | "tasks";
@@ -36,6 +38,8 @@ export default function AdminPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [sessionUser, setSessionUser] = useState("");
   const [userRole, setUserRole] = useState<"admin" | "reviewer" | null>(null);
+  /** From API `/api/auth/me` and login; also treat username `admin` as admin. */
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [loginUser, setLoginUser] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -50,12 +54,18 @@ export default function AdminPage() {
     fetch("/api/auth/me", { headers: { Authorization: `Bearer ${t}` } })
       .then((r) => {
         if (!r.ok) throw new Error("session");
-        return r.json() as Promise<{ user: { username: string; role: "admin" | "reviewer" } }>;
+        return r.json() as Promise<{
+          user: { username: string; role: "admin" | "reviewer"; isAdmin?: boolean };
+        }>;
       })
       .then((data) => {
         setIsLoggedIn(true);
         setSessionUser(data.user.username);
         setUserRole(data.user.role);
+        setIsAdmin(
+          data.user.isAdmin ??
+            (data.user.role === "admin" || data.user.username.toLowerCase() === "admin")
+        );
       })
       .catch(() => {
         setStoredToken(null);
@@ -84,6 +94,16 @@ export default function AdminPage() {
   const [creating, setCreating] = useState(false);
 
   const [langModalTaskId, setLangModalTaskId] = useState<string | null>(null);
+
+  const [assignTaskId, setAssignTaskId] = useState<string | null>(null);
+  const [assignReviewers, setAssignReviewers] = useState<{ username: string }[]>([]);
+  const [assignSelected, setAssignSelected] = useState("");
+  const [assignSaving, setAssignSaving] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
+
+  const isAdminEffective =
+    isAdmin ??
+    (userRole === "admin" || sessionUser.toLowerCase() === "admin");
 
   const [aiWarning, setAiWarning] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -128,7 +148,7 @@ export default function AdminPage() {
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
         token?: string;
-        user?: { username: string; role: "admin" | "reviewer" };
+        user?: { username: string; role: "admin" | "reviewer"; isAdmin?: boolean };
       };
       if (!res.ok) {
         setLoginError(data.error ?? "Request failed");
@@ -139,6 +159,10 @@ export default function AdminPage() {
         setIsLoggedIn(true);
         setSessionUser(data.user.username);
         setUserRole(data.user.role);
+        setIsAdmin(
+          data.user.isAdmin ??
+            (data.user.role === "admin" || data.user.username.toLowerCase() === "admin")
+        );
         setLoginPassword("");
       }
     } catch {
@@ -151,6 +175,7 @@ export default function AdminPage() {
     setIsLoggedIn(false);
     setSessionUser("");
     setUserRole(null);
+    setIsAdmin(null);
     setLoginUser("");
     setLoginPassword("");
   };
@@ -175,6 +200,45 @@ export default function AdminPage() {
     } catch (e) {
       console.error("Failed to delete task", e);
       alert("Failed to delete the task. Please try again.");
+    }
+  };
+
+  const openAssignModal = async (taskId: string, currentReviewer?: string | null) => {
+    setAssignTaskId(taskId);
+    setAssignError(null);
+    setAssignSelected(currentReviewer ?? "");
+    setAssignReviewers([]);
+    try {
+      const res = await fetch("/api/users/reviewers", { headers: authJsonHeaders() });
+      if (!res.ok) throw new Error("Failed to load reviewers");
+      const data = (await res.json()) as { reviewers?: { username: string }[] };
+      setAssignReviewers(data.reviewers ?? []);
+    } catch {
+      setAssignError("Could not load reviewer list.");
+    }
+  };
+
+  const submitAssign = async () => {
+    if (!assignTaskId || !assignSelected.trim()) return;
+    setAssignSaving(true);
+    setAssignError(null);
+    try {
+      const res = await fetch(`/api/tasks/${assignTaskId}/assignment`, {
+        method: "POST",
+        headers: authJsonHeaders(),
+        body: JSON.stringify({ reviewerUsername: assignSelected.trim() }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Assignment failed");
+      const listRes = await fetch("/api/tasks", { headers: authJsonHeaders() });
+      if (listRes.ok) {
+        setTasks((await listRes.json()) as AdminTaskRow[]);
+      }
+      setAssignTaskId(null);
+    } catch (e) {
+      setAssignError(e instanceof Error ? e.message : "Assignment failed");
+    } finally {
+      setAssignSaving(false);
     }
   };
 
@@ -261,7 +325,7 @@ export default function AdminPage() {
             {" · "}
             Your role is:{" "}
             <span className="font-semibold">
-              {userRole === "admin" ? "Admin" : "Task Reviewer"}
+              {isAdminEffective ? "Admin" : "Task Reviewer"}
             </span>
           </p>
           <button
@@ -342,16 +406,20 @@ export default function AdminPage() {
           <div>
             <h2 className="text-xl font-semibold text-slate-900">Tasks</h2>
             <p className="text-sm text-slate-600">
-              Filter and review all authoring tasks.
+              {isAdminEffective
+                ? "Filter and manage all authoring tasks."
+                : "Tasks assigned to you for review."}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={openCreateModal}
-            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
-          >
-            Create task
-          </button>
+          {isAdminEffective && (
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+            >
+              Create task
+            </button>
+          )}
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
@@ -407,6 +475,9 @@ export default function AdminPage() {
                   <th className="px-3 py-2">Language</th>
                   <th className="px-3 py-2">Status</th>
                   <th className="px-3 py-2">Created</th>
+                  {isAdminEffective && (
+                    <th className="px-3 py-2">Reviewer</th>
+                  )}
                   <th className="px-3 py-2 text-right">Actions</th>
                 </tr>
               </thead>
@@ -414,7 +485,7 @@ export default function AdminPage() {
                 {filteredTasks.length === 0 && (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={isAdminEffective ? 6 : 5}
                       className="px-3 py-4 text-center text-sm text-slate-500"
                     >
                       No tasks match current filters.
@@ -455,8 +526,17 @@ export default function AdminPage() {
                           {created.toLocaleTimeString()}
                         </span>
                       </td>
+                      {isAdminEffective && (
+                        <td className="px-3 py-2 align-top text-slate-700">
+                          {t.assignedReviewer ? (
+                            <span className="font-mono text-xs">{t.assignedReviewer}</span>
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
+                        </td>
+                      )}
                       <td className="px-3 py-2 align-top">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex flex-wrap justify-end gap-2">
                           {t.status === "pending_review" ? (
                             <button
                               type="button"
@@ -474,6 +554,15 @@ export default function AdminPage() {
                               Open
                             </button>
                           )}
+                          {isAdminEffective && (
+                            <button
+                              type="button"
+                              onClick={() => openAssignModal(t.id, t.assignedReviewer)}
+                              className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                            >
+                              Assign
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => setLangModalTaskId(t.id)}
@@ -488,6 +577,7 @@ export default function AdminPage() {
                           >
                             Preview
                           </button>
+                          {isAdminEffective && (
                           <button
                             type="button"
                             onClick={() => handleDeleteTask(t.id, t.title)}
@@ -498,6 +588,7 @@ export default function AdminPage() {
                               <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5z" clipRule="evenodd" />
                             </svg>
                           </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -755,6 +846,54 @@ export default function AdminPage() {
                     Choose JSON file to import
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Assign reviewer (admin) */}
+      {assignTaskId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="flex w-full max-w-md flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-slate-900">Assign reviewer</h2>
+            <p className="mt-1 font-mono text-xs text-slate-500">{assignTaskId}</p>
+            <p className="mt-2 text-sm text-slate-600">
+              Choose which reviewer is responsible for this task.
+            </p>
+            {assignError && (
+              <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{assignError}</p>
+            )}
+            <label className="mt-4 flex flex-col gap-1 text-sm">
+              <span className="font-medium text-slate-700">Reviewer</span>
+              <select
+                value={assignSelected}
+                onChange={(e) => setAssignSelected(e.target.value)}
+                className="rounded border border-slate-300 px-3 py-2 text-sm"
+              >
+                <option value="">Select reviewer…</option>
+                {assignReviewers.map((r) => (
+                  <option key={r.username} value={r.username}>
+                    {r.username}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="mt-6 flex justify-end gap-2 border-t border-slate-200 pt-4">
+              <button
+                type="button"
+                disabled={assignSaving}
+                onClick={() => setAssignTaskId(null)}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={assignSaving || !assignSelected.trim()}
+                onClick={submitAssign}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {assignSaving ? "Saving…" : "Save"}
               </button>
             </div>
           </div>
