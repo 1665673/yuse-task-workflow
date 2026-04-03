@@ -334,3 +334,12 @@ export function flattenTaskFlow(task: TaskPackage): {
 
   return { phaseGuidanceItems, flowItems };
 }
+
+/** Storage id for phase-4 distractor options (schema still requires `id`; hidden in admin). */
+export function newPhase4DistractorOptionId(existing: readonly { id?: string }[]): string {
+  const used = new Set(existing.map((o) => (o.id ?? "").trim()).filter(Boolean));
+  for (;;) {
+    const id = `opt_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
+    if (!used.has(id)) return id;
+  }
+}

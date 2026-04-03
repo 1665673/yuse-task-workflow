@@ -18,6 +18,7 @@ import type {
   Phase5SentencesStep,
   Phase6RoleplayStep,
 } from "@/lib/types";
+import { newPhase4DistractorOptionId } from "@/lib/task-utils";
 
 type TabKey =
   | "info"
@@ -1150,6 +1151,24 @@ function Phase3Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
   );
 }
 
+/** Plus-in-circle — add this dialogue turn to distractor editing. */
+function Phase4AddTurnIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M12 8.5v7M8.5 12h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
   const { phase, index } = findPhase(task, "subtask_learning");
   if (!phase) return <p className="text-sm text-slate-500">Phase \"subtask_learning\" not found.</p>;
@@ -1166,11 +1185,13 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
   };
 
   const subtasks = step.subtasks ?? [];
+  const dialogues = task.taskModel?.dialogues ?? [];
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-600">
-        Edit subtasks, linked dialogues, allowed roles, and distractor options for each learner turn.
+        Edit subtasks, linked dialogues, allowed roles, and distractor options. For each subtask, the full dialogue is
+        shown below; use the + button on a line to attach distractor options to that turn (by turn index).
       </p>
 
       <div className="space-y-3">
@@ -1236,119 +1257,164 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
               </label>
             </div>
 
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-700">Distractor turns</p>
-              {(st.dialogDistractors ?? []).map((d, dIdx) => (
-                <div key={dIdx} className="space-y-2 rounded border border-slate-200 bg-slate-50 p-2 text-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <label className="flex flex-col gap-1">
-                      <span className="font-medium text-slate-700">Turn index</span>
-                      <input
-                        type="number"
-                        value={d.index}
-                        onChange={(e) => {
-                          const indexNum = Number(e.target.value) || 0;
-                          const next = [...(st.dialogDistractors ?? [])];
-                          next[dIdx] = { ...d, index: indexNum };
-                          const subtasksNext = [...subtasks];
-                          subtasksNext[i] = { ...st, dialogDistractors: next };
-                          updateStep({ ...step, subtasks: subtasksNext });
-                        }}
-                        className="w-24 rounded border border-slate-300 px-2 py-1"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = (st.dialogDistractors ?? []).filter((_, idx) => idx !== dIdx);
-                        const subtasksNext = [...subtasks];
-                        subtasksNext[i] = { ...st, dialogDistractors: next };
-                        updateStep({ ...step, subtasks: subtasksNext });
-                      }}
-                      className="text-xs text-red-600 hover:underline"
-                    >
-                      Remove distractor
-                    </button>
-                  </div>
-                  <div className="space-y-1">
-                    {(d.options ?? []).map((o, oIdx) => (
-                      <div key={oIdx} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          placeholder="Option ID"
-                          value={o.id}
-                          onChange={(e) => {
-                            const opts = [...(d.options ?? [])];
-                            opts[oIdx] = { ...o, id: e.target.value };
-                            const ds = [...(st.dialogDistractors ?? [])];
-                            ds[dIdx] = { ...d, options: opts };
-                            const subtasksNext = [...subtasks];
-                            subtasksNext[i] = { ...st, dialogDistractors: ds };
-                            updateStep({ ...step, subtasks: subtasksNext });
-                          }}
-                          className="w-32 rounded border border-slate-300 px-2 py-1"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Option text"
-                          value={o.text}
-                          onChange={(e) => {
-                            const opts = [...(d.options ?? [])];
-                            opts[oIdx] = { ...o, text: e.target.value };
-                            const ds = [...(st.dialogDistractors ?? [])];
-                            ds[dIdx] = { ...d, options: opts };
-                            const subtasksNext = [...subtasks];
-                            subtasksNext[i] = { ...st, dialogDistractors: ds };
-                            updateStep({ ...step, subtasks: subtasksNext });
-                          }}
-                          className="flex-1 rounded border border-slate-300 px-2 py-1"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const opts = (d.options ?? []).filter((_, idx) => idx !== oIdx);
-                            const ds = [...(st.dialogDistractors ?? [])];
-                            ds[dIdx] = { ...d, options: opts };
-                            const subtasksNext = [...subtasks];
-                            subtasksNext[i] = { ...st, dialogDistractors: ds };
-                            updateStep({ ...step, subtasks: subtasksNext });
-                          }}
-                          className="text-xs text-red-600 hover:underline"
+            {(() => {
+              const dlg = dialogues.find((d) => d.id === st.dialogueId);
+              const turns = dlg?.turns ?? [];
+
+              if (!st.dialogueId.trim()) {
+                return (
+                  <p className="text-sm text-slate-500">Enter a dialogue ID to preview turns and set distractors.</p>
+                );
+              }
+              if (!dlg) {
+                return (
+                  <p className="text-sm text-amber-700">
+                    No dialogue in task model with id &quot;{st.dialogueId}&quot;. Add it under Task model → dialogues,
+                    or fix the ID.
+                  </p>
+                );
+              }
+              if (turns.length === 0) {
+                return <p className="text-sm text-slate-500">This dialogue has no turns.</p>;
+              }
+
+              return (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-slate-700">Dialogue — distractor turns</p>
+                  <p className="text-xs text-slate-500">
+                    Each line is one speak turn (index matches task JSON). Click + to edit distractor options for that
+                    turn.
+                  </p>
+                  <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50/80 p-2">
+                    {turns.map((turn, turnIdx) => {
+                      const ds = st.dialogDistractors ?? [];
+                      const dIdx = ds.findIndex((d) => d.index === turnIdx);
+                      const hasDistractor = dIdx >= 0;
+                      const d = hasDistractor ? ds[dIdx] : null;
+
+                      return (
+                        <div
+                          key={turnIdx}
+                          className={`rounded-md border bg-white ${hasDistractor ? "border-blue-200 ring-1 ring-blue-100" : "border-slate-100"}`}
                         >
-                          Remove option
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const opts = [...(d.options ?? []), { id: "", text: "" }];
-                        const ds = [...(st.dialogDistractors ?? [])];
-                        ds[dIdx] = { ...d, options: opts };
-                        const subtasksNext = [...subtasks];
-                        subtasksNext[i] = { ...st, dialogDistractors: ds };
-                        updateStep({ ...step, subtasks: subtasksNext });
-                      }}
-                      className="text-xs text-blue-600 hover:underline"
-                    >
-                      Add option
-                    </button>
+                          <div className="flex items-start gap-2 py-2 pl-2 pr-1">
+                            <span
+                              className="mt-0.5 w-7 shrink-0 text-right text-xs tabular-nums text-slate-400"
+                              title="Turn index"
+                            >
+                              {turnIdx}
+                            </span>
+                            <span className="mt-0.5 shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium uppercase text-slate-600">
+                              {turn.role}
+                            </span>
+                            <span className="min-w-0 flex-1 text-sm leading-snug text-slate-800">{turn.text}</span>
+                            {!hasDistractor && (
+                              <button
+                                type="button"
+                                title="Add distractor options for this turn"
+                                aria-label={`Add distractor options for turn ${turnIdx}`}
+                                onClick={() => {
+                                  const cur = st.dialogDistractors ?? [];
+                                  if (cur.some((x) => x.index === turnIdx)) return;
+                                  const subtasksNext = [...subtasks];
+                                  subtasksNext[i] = {
+                                    ...st,
+                                    dialogDistractors: [...cur, { index: turnIdx, options: [] }],
+                                  };
+                                  updateStep({ ...step, subtasks: subtasksNext });
+                                }}
+                                className="shrink-0 rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-blue-600"
+                              >
+                                <Phase4AddTurnIcon />
+                              </button>
+                            )}
+                          </div>
+                          {hasDistractor && d && (
+                            <div className="space-y-2 border-t border-slate-100 bg-slate-50/90 p-2 text-sm">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-medium text-slate-600">
+                                  Distractor options (turn index {turnIdx})
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = (st.dialogDistractors ?? []).filter((_, idx) => idx !== dIdx);
+                                    const subtasksNext = [...subtasks];
+                                    subtasksNext[i] = { ...st, dialogDistractors: next };
+                                    updateStep({ ...step, subtasks: subtasksNext });
+                                  }}
+                                  className="text-xs text-red-600 hover:underline"
+                                >
+                                  Remove distractor
+                                </button>
+                              </div>
+                              <div className="space-y-1">
+                                {(d.options ?? []).map((o, oIdx) => (
+                                  <div key={oIdx} className="flex items-center gap-2">
+                                    <input
+                                      type="text"
+                                      placeholder="Distractor text"
+                                      value={o.text}
+                                      onChange={(e) => {
+                                        const opts = [...(d.options ?? [])];
+                                        const prev = opts[oIdx];
+                                        opts[oIdx] = {
+                                          ...prev,
+                                          id: prev.id?.trim() || newPhase4DistractorOptionId(opts),
+                                          text: e.target.value,
+                                        };
+                                        const dsNext = [...(st.dialogDistractors ?? [])];
+                                        dsNext[dIdx] = { ...d, options: opts };
+                                        const subtasksNext = [...subtasks];
+                                        subtasksNext[i] = { ...st, dialogDistractors: dsNext };
+                                        updateStep({ ...step, subtasks: subtasksNext });
+                                      }}
+                                      className="flex-1 rounded border border-slate-300 px-2 py-1"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const opts = (d.options ?? []).filter((_, idx) => idx !== oIdx);
+                                        const dsNext = [...(st.dialogDistractors ?? [])];
+                                        dsNext[dIdx] = { ...d, options: opts };
+                                        const subtasksNext = [...subtasks];
+                                        subtasksNext[i] = { ...st, dialogDistractors: dsNext };
+                                        updateStep({ ...step, subtasks: subtasksNext });
+                                      }}
+                                      className="text-xs text-red-600 hover:underline"
+                                    >
+                                      Remove option
+                                    </button>
+                                  </div>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const base = d.options ?? [];
+                                    const opts = [
+                                      ...base,
+                                      { id: newPhase4DistractorOptionId(base), text: "" },
+                                    ];
+                                    const dsNext = [...(st.dialogDistractors ?? [])];
+                                    dsNext[dIdx] = { ...d, options: opts };
+                                    const subtasksNext = [...subtasks];
+                                    subtasksNext[i] = { ...st, dialogDistractors: dsNext };
+                                    updateStep({ ...step, subtasks: subtasksNext });
+                                  }}
+                                  className="text-xs text-blue-600 hover:underline"
+                                >
+                                  Add option
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => {
-                  const next = [...(st.dialogDistractors ?? []), { index: 0, options: [] }];
-                  const subtasksNext = [...subtasks];
-                  subtasksNext[i] = { ...st, dialogDistractors: next };
-                  updateStep({ ...step, subtasks: subtasksNext });
-                }}
-                className="text-sm text-blue-600 hover:underline"
-              >
-                Add distractor turn
-              </button>
-            </div>
+              );
+            })()}
           </div>
         ))}
       </div>

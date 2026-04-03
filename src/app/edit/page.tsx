@@ -17,6 +17,7 @@ import type {
   Phase5SentencesStep,
   Phase6RoleplayStep,
 } from "@/lib/types";
+import { newPhase4DistractorOptionId } from "@/lib/task-utils";
 
 type TabKey =
   | "info"
@@ -1164,26 +1165,16 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                       <div key={oIdx} className="flex items-center gap-2">
                         <input
                           type="text"
-                          placeholder="Option ID"
-                          value={o.id}
-                          onChange={(e) => {
-                            const opts = [...(d.options ?? [])];
-                            opts[oIdx] = { ...o, id: e.target.value };
-                            const ds = [...(st.dialogDistractors ?? [])];
-                            ds[dIdx] = { ...d, options: opts };
-                            const subtasksNext = [...subtasks];
-                            subtasksNext[i] = { ...st, dialogDistractors: ds };
-                            updateStep({ ...step, subtasks: subtasksNext });
-                          }}
-                          className="w-32 rounded border border-slate-300 px-2 py-1"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Option text"
+                          placeholder="Distractor text"
                           value={o.text}
                           onChange={(e) => {
                             const opts = [...(d.options ?? [])];
-                            opts[oIdx] = { ...o, text: e.target.value };
+                            const prev = opts[oIdx];
+                            opts[oIdx] = {
+                              ...prev,
+                              id: prev.id?.trim() || newPhase4DistractorOptionId(opts),
+                              text: e.target.value,
+                            };
                             const ds = [...(st.dialogDistractors ?? [])];
                             ds[dIdx] = { ...d, options: opts };
                             const subtasksNext = [...subtasks];
@@ -1211,7 +1202,8 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                     <button
                       type="button"
                       onClick={() => {
-                        const opts = [...(d.options ?? []), { id: "", text: "" }];
+                        const base = d.options ?? [];
+                        const opts = [...base, { id: newPhase4DistractorOptionId(base), text: "" }];
                         const ds = [...(st.dialogDistractors ?? [])];
                         ds[dIdx] = { ...d, options: opts };
                         const subtasksNext = [...subtasks];
