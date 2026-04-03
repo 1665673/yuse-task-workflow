@@ -2,6 +2,11 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  authJsonHeaders,
+  getStoredToken,
+  setStoredToken,
+} from "@/lib/api";
 
 type TaskStatus = "draft" | "pending_review" | "production";
 
@@ -29,6 +34,9 @@ const TARGET_LANGUAGES = [
 export default function AdminPage() {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [sessionUser, setSessionUser] = useState("");
+  const [userRole, setUserRole] = useState<"admin" | "reviewer" | null>(null);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [loginUser, setLoginUser] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -37,11 +45,33 @@ export default function AdminPage() {
   const [tasks, setTasks] = useState<AdminTaskRow[]>([]);
 
   useEffect(() => {
-    fetch("/api/tasks")
-      .then((r) => r.json())
+    const t = getStoredToken();
+    if (!t) return;
+    fetch("/api/auth/me", { headers: { Authorization: `Bearer ${t}` } })
+      .then((r) => {
+        if (!r.ok) throw new Error("session");
+        return r.json() as Promise<{ user: { username: string; role: "admin" | "reviewer" } }>;
+      })
+      .then((data) => {
+        setIsLoggedIn(true);
+        setSessionUser(data.user.username);
+        setUserRole(data.user.role);
+      })
+      .catch(() => {
+        setStoredToken(null);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    fetch("/api/tasks", { headers: authJsonHeaders() })
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to load tasks");
+        return r.json();
+      })
       .then((data: AdminTaskRow[]) => setTasks(data))
       .catch((e) => console.error("Failed to load tasks", e));
-  }, []);
+  }, [isLoggedIn]);
 
   const [filterLanguage, setFilterLanguage] = useState<string>("English");
   const [filterStatus, setFilterStatus] = useState<TaskStatus | "all">("all");
@@ -82,34 +112,47 @@ export default function AdminPage() {
   const draftCount = tasks.filter((t) => t.status === "draft").length;
   const productionCount = tasks.filter((t) => t.status === "production").length;
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem("adminLoggedIn");
-    if (stored === "true") {
-      setIsLoggedIn(true);
-    }
-  }, []);
-
-  const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (loginUser === "admin" && loginPassword === "1234") {
-      setIsLoggedIn(true);
-      setLoginError(null);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("adminLoggedIn", "true");
+    setLoginError(null);
+    try {
+      const path = authMode === "register" ? "/api/auth/register" : "/api/auth/login";
+      const res = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: loginUser.trim(),
+          password: loginPassword,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        token?: string;
+        user?: { username: string; role: "admin" | "reviewer" };
+      };
+      if (!res.ok) {
+        setLoginError(data.error ?? "Request failed");
+        return;
       }
-    } else {
-      setLoginError("Invalid username or password.");
+      if (data.token && data.user) {
+        setStoredToken(data.token);
+        setIsLoggedIn(true);
+        setSessionUser(data.user.username);
+        setUserRole(data.user.role);
+        setLoginPassword("");
+      }
+    } catch {
+      setLoginError("Network error");
     }
   };
 
   const handleSignOut = () => {
+    setStoredToken(null);
     setIsLoggedIn(false);
+    setSessionUser("");
+    setUserRole(null);
     setLoginUser("");
     setLoginPassword("");
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem("adminLoggedIn");
-    }
   };
 
   const openCreateModal = () => {
@@ -123,7 +166,10 @@ export default function AdminPage() {
   const handleDeleteTask = async (id: string, title: string) => {
     if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
     try {
-      const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/tasks/${id}`, {
+        method: "DELETE",
+        headers: authJsonHeaders(),
+      });
       if (!res.ok) throw new Error("Server error");
       setTasks((prev) => prev.filter((t) => t.id !== id));
     } catch (e) {
@@ -156,7 +202,7 @@ export default function AdminPage() {
       };
       const res = await fetch("/api/tasks", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authJsonHeaders(),
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Server returned an error");
@@ -191,7 +237,7 @@ export default function AdminPage() {
       };
       const res = await fetch("/api/tasks", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authJsonHeaders(),
         body: JSON.stringify(body),
       });
       const created = (await res.json()) as AdminTaskRow;
@@ -211,7 +257,12 @@ export default function AdminPage() {
         <h2 className="text-xl font-semibold text-slate-900">Overview</h2>
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-sm font-medium text-slate-800">
-            Your role is: <span className="font-semibold">Task Reviewer</span>
+            Signed in as <span className="font-mono text-slate-700">{sessionUser}</span>
+            {" · "}
+            Your role is:{" "}
+            <span className="font-semibold">
+              {userRole === "admin" ? "Admin" : "Task Reviewer"}
+            </span>
           </p>
           <button
             type="button"
@@ -464,10 +515,30 @@ export default function AdminPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
         <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h1 className="mb-2 text-xl font-semibold text-slate-900">Admin login</h1>
+          <h1 className="mb-2 text-xl font-semibold text-slate-900">
+            {authMode === "login" ? "Sign in" : "Create account"}
+          </h1>
           <p className="mb-4 text-sm text-slate-600">
-            Please sign in to access the admin portal.
+            {authMode === "login"
+              ? "Sign in with your reviewer or admin account."
+              : "New accounts are reviewers. Admins are created separately."}
           </p>
+          <div className="mb-4 flex gap-2 text-sm">
+            <button
+              type="button"
+              className={`rounded-full px-3 py-1 ${authMode === "login" ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-600"}`}
+              onClick={() => { setAuthMode("login"); setLoginError(null); }}
+            >
+              Login
+            </button>
+            <button
+              type="button"
+              className={`rounded-full px-3 py-1 ${authMode === "register" ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-600"}`}
+              onClick={() => { setAuthMode("register"); setLoginError(null); }}
+            >
+              Register
+            </button>
+          </div>
           {loginError && (
             <p className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">
               {loginError}
@@ -478,6 +549,7 @@ export default function AdminPage() {
               <span className="font-medium text-slate-700">Username</span>
               <input
                 type="text"
+                autoComplete="username"
                 value={loginUser}
                 onChange={(e) => setLoginUser(e.target.value)}
                 placeholder="Enter username"
@@ -488,6 +560,7 @@ export default function AdminPage() {
               <span className="font-medium text-slate-700">Password</span>
               <input
                 type="password"
+                autoComplete={authMode === "register" ? "new-password" : "current-password"}
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
                 placeholder="Enter password"
@@ -498,7 +571,7 @@ export default function AdminPage() {
               type="submit"
               className="mt-2 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
-              Sign in
+              {authMode === "login" ? "Sign in" : "Create account"}
             </button>
           </form>
         </div>

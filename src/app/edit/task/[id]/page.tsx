@@ -24,6 +24,7 @@ import {
   newPhase4SubtaskId,
   syncPhase6RoleplayDifficultiesFromDialogues,
 } from "@/lib/task-utils";
+import { authJsonHeaders, authMultipartHeaders } from "@/lib/api";
 
 type TabKey =
   | "info"
@@ -624,7 +625,11 @@ function AssetSection({ label, assetType, items, onChange }: AssetSectionProps) 
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: authMultipartHeaders(),
+        body: fd,
+      });
       const data = (await res.json()) as { url?: string; error?: string };
       if (data.url) updateItem(uploadingIdx, { url: data.url });
     } catch (err) {
@@ -2134,7 +2139,7 @@ export default function TaskEditPage() {
         : task;
       const res = await fetch(`/api/tasks/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: authJsonHeaders(),
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Save failed");

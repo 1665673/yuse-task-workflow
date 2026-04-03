@@ -23,6 +23,7 @@ import {
   newPhase4SubtaskId,
   syncPhase6RoleplayDifficultiesFromDialogues,
 } from "@/lib/task-utils";
+import { authMultipartHeaders } from "@/lib/api";
 
 type TabKey =
   | "info"
@@ -537,7 +538,11 @@ function AssetSection({ label, assetType, items, onChange }: AssetSectionProps) 
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: authMultipartHeaders(),
+        body: fd,
+      });
       const data = (await res.json()) as { url?: string; error?: string };
       if (data.url) updateItem(uploadingIdx, { url: data.url });
     } catch (err) {
@@ -1743,26 +1748,31 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   return <p className="text-sm text-slate-500">This dialogue has no turns.</p>;
                 }
 
+                const seenTurnIndex = new Set<number>();
                 const orphanEntries = hints
                   .map((h, globalIdx) => ({ h, globalIdx }))
-                  .filter(({ h }) => h.index < 0 || h.index >= turns.length);
+                  .filter(({ h }) => {
+                    if (h.index < 0 || h.index >= turns.length) return true;
+                    if (seenTurnIndex.has(h.index)) return true;
+                    seenTurnIndex.add(h.index);
+                    return false;
+                  });
 
                 return (
                   <div className="space-y-2">
                     <p className="text-xs text-slate-500">
-                      Each line is one speak turn (index matches task JSON). Use + to attach a hint for that turn.
+                      Each line is one speak turn. At most one hint per turn — use + to add, or edit below.
                     </p>
                     <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50/80 p-2">
                       {turns.map((turn, turnIdx) => {
-                        const atTurn = hints
-                          .map((h, globalIdx) => ({ h, globalIdx }))
-                          .filter(({ h }) => h.index === turnIdx);
-                        const hasHints = atTurn.length > 0;
+                        const hintGlobalIdx = hints.findIndex((h) => h.index === turnIdx);
+                        const hasHint = hintGlobalIdx >= 0;
+                        const h = hasHint ? hints[hintGlobalIdx] : null;
 
                         return (
                           <div
                             key={turnIdx}
-                            className={`rounded-md border bg-white ${hasHints ? "border-violet-200 ring-1 ring-violet-100" : "border-slate-100"}`}
+                            className={`rounded-md border bg-white ${hasHint ? "border-violet-200 ring-1 ring-violet-100" : "border-slate-100"}`}
                           >
                             <div className="flex items-start gap-2 py-2 pl-2 pr-1">
                               <span
@@ -1775,7 +1785,7 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                                 {turn.role}
                               </span>
                               <span className="min-w-0 flex-1 text-sm leading-snug text-slate-800">{turn.text}</span>
-                              {!hasHints && (
+                              {!hasHint && (
                                 <button
                                   type="button"
                                   title="Add hint for this turn"
@@ -1792,50 +1802,36 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                                 </button>
                               )}
                             </div>
-                            {hasHints && (
+                            {hasHint && h && (
                               <div className="space-y-2 border-t border-slate-100 bg-slate-50/90 p-2 text-sm">
-                                <p className="text-xs font-medium text-slate-600">Hints for turn {turnIdx}</p>
-                                {atTurn.map(({ h, globalIdx }) => (
-                                  <div key={globalIdx} className="flex items-start gap-2">
-                                    <input
-                                      type="text"
-                                      placeholder="Hint text"
-                                      value={h.text}
-                                      onChange={(e) => {
-                                        const nextHints = [...hints];
-                                        nextHints[globalIdx] = { ...h, text: e.target.value };
-                                        const nextRp = [...roleplays];
-                                        nextRp[i] = { ...rp, dialogHints: nextHints };
-                                        updateStep({ ...step, roleplays: nextRp });
-                                      }}
-                                      className="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const nextHints = hints.filter((_, idx) => idx !== globalIdx);
-                                        const nextRp = [...roleplays];
-                                        nextRp[i] = { ...rp, dialogHints: nextHints };
-                                        updateStep({ ...step, roleplays: nextRp });
-                                      }}
-                                      className="shrink-0 text-xs text-red-600 hover:underline"
-                                    >
-                                      Remove
-                                    </button>
-                                  </div>
-                                ))}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const nextHints = [...hints, { index: turnIdx, text: "" }];
-                                    const nextRp = [...roleplays];
-                                    nextRp[i] = { ...rp, dialogHints: nextHints };
-                                    updateStep({ ...step, roleplays: nextRp });
-                                  }}
-                                  className="text-xs text-violet-600 hover:underline"
-                                >
-                                  Add another hint for this turn
-                                </button>
+                                <p className="text-xs font-medium text-slate-600">Hint for turn {turnIdx}</p>
+                                <div className="flex items-start gap-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Hint text"
+                                    value={h.text}
+                                    onChange={(e) => {
+                                      const nextHints = [...hints];
+                                      nextHints[hintGlobalIdx] = { ...h, text: e.target.value };
+                                      const nextRp = [...roleplays];
+                                      nextRp[i] = { ...rp, dialogHints: nextHints };
+                                      updateStep({ ...step, roleplays: nextRp });
+                                    }}
+                                    className="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const nextHints = hints.filter((x) => x.index !== turnIdx);
+                                      const nextRp = [...roleplays];
+                                      nextRp[i] = { ...rp, dialogHints: nextHints };
+                                      updateStep({ ...step, roleplays: nextRp });
+                                    }}
+                                    className="shrink-0 text-xs text-red-600 hover:underline"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -1845,7 +1841,7 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                     {orphanEntries.length > 0 ? (
                       <div className="rounded-lg border border-amber-200 bg-amber-50/90 p-3 text-sm">
                         <p className="mb-2 font-medium text-amber-900">
-                          Hints with turn index outside this dialogue (remove or they stay in JSON)
+                          Extra hints (invalid turn index, or duplicate index — only one hint per turn is used above)
                         </p>
                         <div className="space-y-2">
                           {orphanEntries.map(({ h, globalIdx }) => (
