@@ -209,12 +209,17 @@ export default function AdminPage() {
     setAssignSelected(currentReviewer ?? "");
     setAssignReviewers([]);
     try {
-      const res = await fetch("/api/users/reviewers", { headers: authJsonHeaders() });
-      if (!res.ok) throw new Error("Failed to load reviewers");
+      const res = await fetch("/api/auth/reviewers", { headers: authJsonHeaders() });
+      if (!res.ok) {
+        const errBody = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(errBody.error ?? `HTTP ${res.status}`);
+      }
       const data = (await res.json()) as { reviewers?: { username: string }[] };
       setAssignReviewers(data.reviewers ?? []);
-    } catch {
-      setAssignError("Could not load reviewer list.");
+    } catch (e) {
+      setAssignError(
+        e instanceof Error ? e.message : "Could not load reviewer list."
+      );
     }
   };
 
