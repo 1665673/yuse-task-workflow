@@ -1931,6 +1931,7 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
 export default function TaskEditPage() {
   const [task, setTask] = useState<TaskPackage | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("info");
 
@@ -1958,6 +1959,30 @@ export default function TaskEditPage() {
     navigator.clipboard
       .writeText(json)
       .catch(() => alert("Failed to copy JSON to clipboard"));
+  };
+
+  const handleExport = async () => {
+    if (!task?.id) {
+      alert("Task id is required for export (save to backend from the admin task editor).");
+      return;
+    }
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/export/tasks/${encodeURIComponent(task.id)}`);
+      if (!res.ok) throw new Error(await res.text().then((t) => t || `HTTP ${res.status}`));
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `task-export-${task.id}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const renderTabContent = () => {
@@ -2035,6 +2060,14 @@ export default function TaskEditPage() {
               className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Copy JSON to clipboard
+            </button>
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={!task || exporting || !task.id}
+              className="rounded-lg border border-violet-300 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-800 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {exporting ? "Exporting…" : "Export"}
             </button>
           </div>
         </header>

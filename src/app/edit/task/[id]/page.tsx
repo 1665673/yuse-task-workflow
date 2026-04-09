@@ -2107,6 +2107,7 @@ export default function TaskEditPage() {
   const [translations, setTranslations] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("info");
@@ -2147,6 +2148,27 @@ export default function TaskEditPage() {
     navigator.clipboard
       .writeText(json)
       .catch(() => alert("Failed to copy JSON to clipboard"));
+  };
+
+  const handleExport = async () => {
+    if (!id) return;
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/export/tasks/${encodeURIComponent(id)}`);
+      if (!res.ok) throw new Error(await res.text().then((t) => t || `HTTP ${res.status}`));
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `task-export-${id}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleSave = async () => {
@@ -2291,6 +2313,16 @@ export default function TaskEditPage() {
             >
               {isTargetMode ? "Copy Translations" : "Copy JSON"}
             </button>
+            {!isTargetMode && (
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={!task || exporting || !id}
+                className="rounded-lg border border-violet-300 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-800 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {exporting ? "Exporting…" : "Export"}
+              </button>
+            )}
             <button
               type="button"
               onClick={handleSave}
