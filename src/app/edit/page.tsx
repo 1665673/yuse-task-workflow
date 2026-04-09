@@ -36,11 +36,14 @@ import {
   editorLabelL2Inline,
   editorLabelL3,
 } from "@/app/edit/editor-labels";
+import { TaskRolesEditor } from "@/app/edit/task-roles-editor";
+import { dialoguesEditorRoleId, firstUnusedTltsKey, taskRoleTitle } from "@/app/edit/task-editor-utils";
 
 type TabKey =
   | "info"
   | "assets"
   | "tlts"
+  | "dialogues"
   | "phase1"
   | "phase2"
   | "phase3"
@@ -136,48 +139,18 @@ function QuestionListEditor({
             </button>
           </div>
 
-          {/* Type + Guidance */}
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="flex flex-col gap-1 text-sm">
-              <span className={editorLabelL2Inline}>Type</span>
-              <select
-                value={q.type}
-                onChange={(e) => changeType(idx, e.target.value as Question["type"])}
-                className="rounded border border-slate-300 px-2 py-1 text-sm"
-              >
-                <option value="text_text">Stem as text, Options as text</option>
-                <option value="text_image">Stem as text, Options as image</option>
-                <option value="text_cloze">Stem as text, Options as text (cloze)</option>
-                <option value="audio_text">Stem as audio, Options as text</option>
-              </select>
-            </label>
-            {/* Guidance fields hidden for now — data preserved */}
-            {false && (
-              <>
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className={editorLabelL2Inline}>Guidance purpose (optional)</span>
-                  <input
-                    type="text"
-                    value={q.guidance?.purpose ?? ""}
-                    onChange={(e) =>
-                      updateQuestion(idx, { ...q, guidance: { ...(q.guidance ?? { description: "" }), purpose: e.target.value } })
-                    }
-                    className="rounded border border-slate-300 px-2 py-1 text-sm"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-sm md:col-span-2">
-                  <span className={editorLabelL2Inline}>Guidance description (optional)</span>
-                  <textarea
-                    value={q.guidance?.description ?? ""}
-                    onChange={(e) =>
-                      updateQuestion(idx, { ...q, guidance: { ...(q.guidance ?? { purpose: "" }), description: e.target.value } })
-                    }
-                    rows={2}
-                    className="rounded border border-slate-300 px-2 py-1 text-sm"
-                  />
-                </label>
-              </>
-            )}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <span className={editorLabelL2Inline}>Type</span>
+            <select
+              value={q.type}
+              onChange={(e) => changeType(idx, e.target.value as Question["type"])}
+              className="min-h-[2rem] min-w-0 flex-1 rounded border border-slate-300 px-2 py-1 text-sm sm:max-w-xl"
+            >
+              <option value="text_text">Stem as text, Options as text</option>
+              <option value="text_image">Stem as text, Options as image</option>
+              <option value="text_cloze">Stem as text, Options as text (cloze)</option>
+              <option value="audio_text">Stem as audio, Options as text</option>
+            </select>
           </div>
 
           {/* Stem */}
@@ -772,37 +745,6 @@ function Phase2Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className={editorLabelL2Inline}>Step guidance purpose</span>
-          <input
-            type="text"
-            value={step.guidance?.purpose ?? ""}
-            onChange={(e) =>
-              updateStep({
-                ...step,
-                guidance: { ...(step.guidance ?? { description: "" }), purpose: e.target.value },
-              })
-            }
-            className="rounded border border-slate-300 px-2 py-1 text-sm"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm md:col-span-2">
-          <span className={editorLabelL2Inline}>Step guidance description</span>
-          <textarea
-            value={step.guidance?.description ?? ""}
-            onChange={(e) =>
-              updateStep({
-                ...step,
-                guidance: { ...(step.guidance ?? { purpose: "" }), description: e.target.value },
-              })
-            }
-            rows={3}
-            className="rounded border border-slate-300 px-2 py-1 text-sm"
-          />
-        </label>
-      </div>
-
       <div className="space-y-3">
         <p className={editorLabelL1}>Warmup questions</p>
         <QuestionListEditor
@@ -831,12 +773,14 @@ function Phase3Editor({
   onCreateImageAsset: onCreateImageProp,
   onCreateAudioAsset: onCreateAudioProp,
   wordGroupCopy,
+  wordTltsWords,
 }: {
   task: TaskPackage;
   setTask: (t: TaskPackage) => void;
   onCreateImageAsset?: (a: AssetSelectItem) => void;
   onCreateAudioAsset?: (a: AssetSelectItem) => void;
   wordGroupCopy?: Phase3WordGroupCopy;
+  wordTltsWords?: Record<string, string>;
 }) {
   const { phase, index } = findPhase(task, "phase3");
   if (!phase) return <p className="text-sm text-slate-500">Phase \"phase3\" not found.</p>;
@@ -867,13 +811,23 @@ function Phase3Editor({
     label: string,
     map: Record<string, Question[]>,
     onChange: (next: Record<string, Question[]>) => void,
-    groupUi?: { idLabel: string; add: string; remove: string }
+    groupUi?: { idLabel: string; add: string; remove: string },
+    tltsLookup?: Record<string, string>
   ) => {
     const idLabel = groupUi?.idLabel ?? "Item ID";
     const addLabel = groupUi?.add ?? "Add item";
     const removeLabel = groupUi?.remove ?? "Remove item";
+    const useTlts = tltsLookup && Object.keys(tltsLookup).length > 0;
     const entries = Object.entries(map);
     const addKey = () => {
+      if (useTlts && tltsLookup) {
+        const used = new Set(Object.keys(map));
+        const free = firstUnusedTltsKey(tltsLookup, used);
+        if (free) {
+          onChange({ ...map, [free]: [] });
+          return;
+        }
+      }
       let i = 1;
       let key: string;
       do {
@@ -909,20 +863,45 @@ function Phase3Editor({
             key={key}
             className="space-y-2 rounded-lg border border-teal-200/90 border-l-[3px] border-l-teal-500 bg-gradient-to-br from-teal-50/40 to-slate-50 p-3 shadow-sm"
           >
-            <div className="flex items-center justify-between gap-3">
-              <label className="flex flex-col gap-1 text-sm">
-                <span className={editorLabelL2Inline}>{idLabel}</span>
-                <input
-                  type="text"
-                  value={key}
-                  onChange={(e) => updateKey(key, e.target.value)}
-                  className="rounded border border-slate-300 px-2 py-1 text-sm"
-                />
-              </label>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+              {useTlts && tltsLookup ? (
+                <div className="min-w-0 flex-1 space-y-2">
+                  <span className={editorLabelL2Inline}>{idLabel}</span>
+                  <p className="text-base font-medium leading-snug text-slate-900">
+                    {(tltsLookup[key] ?? "").trim() || "—"}
+                  </p>
+                  <select
+                    value={key}
+                    onChange={(e) => updateKey(key, e.target.value)}
+                    className="w-full max-w-lg rounded border border-slate-300 bg-white px-2 py-1.5 text-sm"
+                  >
+                    {Object.entries(tltsLookup)
+                      .filter(([k]) => k === key || !(k in map))
+                      .map(([k, text]) => (
+                        <option key={k} value={k}>
+                          {(text ?? "").trim() || k}
+                        </option>
+                      ))}
+                    {!Object.prototype.hasOwnProperty.call(tltsLookup, key) ? (
+                      <option value={key}>Missing in TLTS: {key}</option>
+                    ) : null}
+                  </select>
+                </div>
+              ) : (
+                <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+                  <span className={editorLabelL2Inline}>{idLabel}</span>
+                  <input
+                    type="text"
+                    value={key}
+                    onChange={(e) => updateKey(key, e.target.value)}
+                    className="rounded border border-slate-300 px-2 py-1 text-sm"
+                  />
+                </label>
+              )}
               <button
                 type="button"
                 onClick={() => removeKey(key)}
-                className="text-sm text-red-600 hover:underline"
+                className="shrink-0 text-sm text-red-600 hover:underline"
               >
                 {removeLabel}
               </button>
@@ -968,7 +947,8 @@ function Phase3Editor({
                 phase.steps.findIndex((s) => s.type === "phase3_words"),
                 { ...wordsStep, wordQuestions: next }
               ),
-            wordGroupUi
+            wordGroupUi,
+            wordGroupCopy ? wordTltsWords : undefined
           )}
         </div>
       )}
@@ -1020,6 +1000,54 @@ function Phase4AddTurnIcon({ className }: { className?: string }) {
   );
 }
 
+function AllowedRolesMultiSelect({
+  task,
+  value,
+  onChange,
+  disabled,
+}: {
+  task: TaskPackage;
+  value: string[];
+  onChange: (next: string[]) => void;
+  disabled?: boolean;
+}) {
+  const roles = task.taskModel.roles ?? [];
+  if (roles.length === 0) {
+    return <p className="text-xs text-amber-700">Add dialogue roles on the Dialogues tab first.</p>;
+  }
+  const toggle = (id: string) => {
+    const set = new Set(value);
+    if (set.has(id)) set.delete(id);
+    else set.add(id);
+    onChange(Array.from(set));
+  };
+  return (
+    <div className="flex flex-wrap gap-2">
+      {roles.map((r, i) => {
+        const id = dialoguesEditorRoleId(r, i);
+        const checked = value.includes(id);
+        return (
+          <label
+            key={id}
+            className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-sm ${
+              checked ? "border-indigo-400 bg-indigo-50 text-indigo-950" : "border-slate-200 bg-white text-slate-700"
+            } ${disabled ? "pointer-events-none opacity-60" : ""}`}
+          >
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300"
+              checked={checked}
+              onChange={() => toggle(id)}
+              disabled={disabled}
+            />
+            <span>{r.title?.trim() || id}</span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
 function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
   const { phase, index } = findPhase(task, "subtask_learning");
   if (!phase) return <p className="text-sm text-slate-500">Phase \"subtask_learning\" not found.</p>;
@@ -1068,9 +1096,6 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className={editorLabelL3}>Subtask {i + 1}</p>
-                <p className="mt-0.5 font-mono text-xs text-slate-500" title="Stored on save; not editable">
-                  ID: {st.subtaskId || "…"}
-                </p>
               </div>
               <button
                 type="button"
@@ -1111,26 +1136,21 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   ) : null}
                 </select>
                 {dialogues.length === 0 ? (
-                  <span className="text-xs text-amber-700">No dialogues in task model yet. Add them under Task model.</span>
+                  <span className="text-xs text-amber-700">No dialogues in the task model yet. Add them in the task editor (Dialogues tab).</span>
                 ) : null}
               </label>
-              <label className="flex flex-col gap-1 text-sm">
-                <span className={editorLabelL2Inline}>Allowed roles (comma-separated)</span>
-                <input
-                  type="text"
-                  value={st.allowedRoles.join(", ")}
-                  onChange={(e) => {
-                    const roles = e.target.value
-                      .split(",")
-                      .map((r) => r.trim())
-                      .filter(Boolean);
+              <div className="flex flex-col gap-1 text-sm md:col-span-2">
+                <span className={editorLabelL2Inline}>Allowed roles</span>
+                <AllowedRolesMultiSelect
+                  task={task}
+                  value={st.allowedRoles}
+                  onChange={(roles) => {
                     const next = [...subtasks];
                     next[i] = { ...st, allowedRoles: roles };
                     updateStep({ ...step, subtasks: next });
                   }}
-                  className="rounded border border-slate-300 px-2 py-1 text-sm"
                 />
-              </label>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -1297,9 +1317,10 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
       {wordsStep && (
         <div className="space-y-3">
           <Phase3Editor
+            wordTltsWords={task.taskModel.tlts.words ?? {}}
             wordGroupCopy={{
               sectionLabel: "Words",
-              itemIdLabel: "Word ID",
+              itemIdLabel: "Word",
               addGroupLabel: "Add word",
               removeGroupLabel: "Remove word",
             }}
@@ -1335,30 +1356,48 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
         <div className="space-y-3">
           <p className={editorLabelL1}>Phrases</p>
           <div className="space-y-3">
-            {Object.entries(phrasesStep.phraseClozes ?? {}).map(([phraseId, entry], idx) => (
+            {Object.entries(phrasesStep.phraseClozes ?? {}).map(([phraseId, entry], idx) => {
+              const tltsPhrases = task.taskModel.tlts.phrases ?? {};
+              const phraseDisplay = (tltsPhrases[phraseId] ?? "").trim();
+              const clozeMap = phrasesStep.phraseClozes ?? {};
+              return (
               <div
                 key={phraseId}
                 className="space-y-2 rounded-lg border border-slate-200 border-l-4 border-l-teal-500 bg-white p-4 shadow-sm"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className={editorLabelL2Inline}>Phrase ID</span>
-                    <input
-                      type="text"
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <span className={editorLabelL2Inline}>Phrase</span>
+                    <p className="text-base font-medium leading-snug text-slate-900">{phraseDisplay || "—"}</p>
+                    <select
                       value={phraseId}
                       onChange={(e) => {
+                        const newKey = e.target.value;
+                        if (!newKey || newKey === phraseId) return;
+                        if (clozeMap[newKey]) return;
                         const next: Record<string, typeof entry> = {};
-                        for (const [k, v] of Object.entries(phrasesStep.phraseClozes ?? {})) {
-                          next[k === phraseId ? e.target.value : k] = v;
+                        for (const [k, v] of Object.entries(clozeMap)) {
+                          next[k === phraseId ? newKey : k] = v;
                         }
                         updateStep<Phase5PhrasesStep>("phase5_phrases", (cur) => ({
                           ...cur,
                           phraseClozes: next,
                         }));
                       }}
-                      className="rounded border border-slate-300 px-2 py-1 text-sm"
-                    />
-                  </label>
+                      className="max-w-lg rounded border border-slate-300 bg-white px-2 py-1.5 text-sm"
+                    >
+                      {Object.entries(tltsPhrases)
+                        .filter(([k]) => k === phraseId || !(k in clozeMap))
+                        .map(([k, text]) => (
+                          <option key={k} value={k}>
+                            {(text ?? "").trim() || k}
+                          </option>
+                        ))}
+                      {!Object.prototype.hasOwnProperty.call(tltsPhrases, phraseId) ? (
+                        <option value={phraseId}>Not in TLTS: {phraseId}</option>
+                      ) : null}
+                    </select>
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
@@ -1484,17 +1523,25 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
             <button
               type="button"
               onClick={() => {
                 const map = phrasesStep.phraseClozes ?? {};
-                let i = 1;
+                const tltsP = task.taskModel.tlts.phrases ?? {};
+                const used = new Set(Object.keys(map));
+                const free = firstUnusedTltsKey(tltsP, used);
                 let key: string;
-                do {
-                  key = `p${i}`;
-                  i += 1;
-                } while (map[key]);
+                if (free) {
+                  key = free;
+                } else {
+                  let i = 1;
+                  do {
+                    key = `p${i}`;
+                    i += 1;
+                  } while (map[key]);
+                }
                 updateStep<Phase5PhrasesStep>("phase5_phrases", (cur) => ({
                   ...cur,
                   phraseClozes: {
@@ -1515,9 +1562,18 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
         <div className="space-y-3">
           <p className={editorLabelL1}>Sentences</p>
           <div className="space-y-2">
-            {(sentencesStep.sentences ?? []).map((s, idx) => (
+            {(sentencesStep.sentences ?? []).map((s, idx) => {
+              const t = s.trim();
+              const preview =
+                t.length === 0 ? `Sentence ${idx + 1}` : t.length > 40 ? `${t.slice(0, 40)}…` : t;
+              return (
               <div key={idx} className="flex items-center gap-2">
-                <span className="text-xs text-slate-500 w-14">#{idx + 1}</span>
+                <span
+                  className="w-32 shrink-0 truncate text-xs text-slate-500"
+                  title={t || undefined}
+                >
+                  {preview}
+                </span>
                 <input
                   type="text"
                   value={s}
@@ -1543,7 +1599,8 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   Remove
                 </button>
               </div>
-            ))}
+              );
+            })}
             <button
               type="button"
               onClick={() =>
@@ -1659,7 +1716,7 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   ) : null}
                 </select>
                 {dialogues.length === 0 ? (
-                  <span className="text-xs text-amber-700">No dialogues in task model yet.</span>
+                  <span className="text-xs text-amber-700">No dialogues in the task model yet. Add them in the task editor (Dialogues tab).</span>
                 ) : null}
               </label>
               <label className="flex flex-col gap-1 text-sm">
@@ -1673,25 +1730,20 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   title="Taken from the selected dialogue in the task model"
                   className="cursor-not-allowed rounded border border-slate-200 bg-slate-50 px-2 py-1 text-sm text-slate-600"
                 />
-                <span className="text-xs text-slate-500">From dialogue; edit under Task model dialogues.</span>
+                <span className="text-xs text-slate-500">From dialogue; edit in the task editor (Dialogues tab).</span>
               </label>
-              <label className="flex flex-col gap-1 text-sm">
-                <span className={editorLabelL2Inline}>Allowed roles (comma-separated)</span>
-                <input
-                  type="text"
-                  value={rp.allowedRoles.join(", ")}
-                  onChange={(e) => {
-                    const roles = e.target.value
-                      .split(",")
-                      .map((r) => r.trim())
-                      .filter(Boolean);
+              <div className="flex flex-col gap-1 text-sm md:col-span-3">
+                <span className={editorLabelL2Inline}>Allowed roles</span>
+                <AllowedRolesMultiSelect
+                  task={task}
+                  value={rp.allowedRoles}
+                  onChange={(roles) => {
                     const next = [...roleplays];
                     next[i] = { ...rp, allowedRoles: roles };
                     updateStep({ ...step, roleplays: next });
                   }}
-                  className="rounded border border-slate-300 px-2 py-1 text-sm"
                 />
-              </label>
+              </div>
             </div>
             <div className="space-y-2">
               <p className={editorLabelL2}>Learner hints by turn</p>
@@ -1749,8 +1801,8 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                               >
                                 {turnIdx}
                               </span>
-                              <span className="mt-0.5 shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium uppercase text-slate-600">
-                                {turn.role}
+                              <span className="mt-0.5 shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">
+                                {taskRoleTitle(task.taskModel.roles, turn.role)}
                               </span>
                               <span className="min-w-0 flex-1 text-sm leading-snug text-slate-800">{turn.text}</span>
                               {!hasHint && (
@@ -1965,6 +2017,8 @@ export default function TaskEditPage() {
             </label>
           </div>
         );
+      case "dialogues":
+        return <TaskRolesEditor task={task} setTask={setTask} />;
       case "assets":
         return <AssetsEditor task={task} setTask={setTask} />;
       case "tlts":
@@ -2037,6 +2091,7 @@ export default function TaskEditPage() {
                   { key: "info", label: "Info" },
                   { key: "assets", label: "Assets" },
                   { key: "tlts", label: "TLTS" },
+                  { key: "dialogues", label: "Dialogues" },
                   { key: "phase1", label: "Phase 1 – Entry" },
                   { key: "phase2", label: "Phase 2 – Warmup" },
                   { key: "phase3", label: "Phase 3 – Language items" },
