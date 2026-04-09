@@ -158,7 +158,8 @@ export function AudioRecordModal({ assetId, onClose, onSaved }: AudioRecordModal
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+      data-audio-record-modal=""
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4"
       role="presentation"
       onClick={(e) => e.target === e.currentTarget && !saving && onClose()}
     >
@@ -167,6 +168,7 @@ export function AudioRecordModal({ assetId, onClose, onSaved }: AudioRecordModal
         role="dialog"
         aria-labelledby="audio-record-modal-title"
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         <h2 id="audio-record-modal-title" className="text-lg font-semibold text-slate-900">
           Record audio

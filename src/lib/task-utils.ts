@@ -430,3 +430,29 @@ export function syncPhase6RoleplayDifficultiesFromDialogues(
     return { ...rp, difficulty: d.difficulty ?? "" };
   });
 }
+
+/** Append one image or audio entry under `taskModel.assets` (used by inline asset creation in editors). */
+export function appendTaskAsset(
+  task: TaskPackage,
+  kind: "image" | "audio",
+  asset: { id: string; prompt: string; url: string }
+): TaskPackage {
+  const bucket = kind === "image" ? "images" : "audios";
+  const prev = task.taskModel.assets[bucket] ?? {};
+  return {
+    ...task,
+    taskModel: {
+      ...task.taskModel,
+      assets: {
+        ...task.taskModel.assets,
+        [bucket]: {
+          ...prev,
+          [asset.id]: {
+            ...(asset.prompt ? { prompt: asset.prompt } : {}),
+            ...(asset.url ? { url: asset.url } : {}),
+          },
+        },
+      },
+    },
+  };
+}

@@ -21,6 +21,7 @@ import type {
   Phase6RoleplayStep,
 } from "@/lib/types";
 import {
+  appendTaskAsset,
   ensurePhase4SubtaskIds,
   newPhase4DistractorOptionId,
   newPhase4SubtaskId,
@@ -30,6 +31,8 @@ import {
 import { authJsonHeaders, authMultipartHeaders } from "@/lib/api";
 import { normalizeTaskPackage } from "@/lib/normalize-task-package";
 import { AudioRecordModal } from "@/components/AudioRecordModal";
+import { AssetSelect, type AssetSelectItem } from "@/components/AssetSelect";
+import { genAssetId, isDataUrl } from "@/lib/asset-utils";
 
 type TabKey =
   | "info"
@@ -129,13 +132,7 @@ function TLTextarea({ className, ...props }: TLTextareaProps) {
 
 // ── Shared asset types & helpers ─────────────────────────────────────────────
 
-interface AssetItem {
-  id: string;
-  prompt: string;
-  url: string;
-}
-
-function taskImageAssets(task: TaskPackage): AssetItem[] {
+function taskImageAssets(task: TaskPackage): AssetSelectItem[] {
   return Object.entries(task.taskModel.assets.images ?? {}).map(([id, a]) => ({
     id,
     prompt: a.prompt ?? "",
@@ -143,7 +140,7 @@ function taskImageAssets(task: TaskPackage): AssetItem[] {
   }));
 }
 
-function taskAudioAssets(task: TaskPackage): AssetItem[] {
+function taskAudioAssets(task: TaskPackage): AssetSelectItem[] {
   return Object.entries(task.taskModel.assets.audios ?? {}).map(([id, a]) => ({
     id,
     prompt: a.prompt ?? "",
@@ -153,153 +150,23 @@ function taskAudioAssets(task: TaskPackage): AssetItem[] {
 
 // ── Question Editor Components ────────────────────────────────────────────────
 
-function AudioInlinePlay({ url }: { url: string }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [playing, setPlaying] = useState(false);
-
-  useEffect(() => () => { audioRef.current?.pause(); }, []);
-
-  const toggle = (e: React.SyntheticEvent) => {
-    e.stopPropagation();
-    const el = audioRef.current;
-    if (!el || !url) return;
-    if (playing) {
-      el.pause();
-      setPlaying(false);
-    } else {
-      el.play().then(() => setPlaying(true)).catch(() => {});
-    }
-  };
-
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (!url) return;
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      e.stopPropagation();
-      toggle(e);
-    }
-  };
-
-  return (
-    <>
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-      <audio ref={audioRef} src={url || undefined} onEnded={() => setPlaying(false)} />
-      {/* span, not button — avoids invalid <button> inside AssetSelect option rows */}
-      <span
-        role="button"
-        tabIndex={url ? 0 : -1}
-        aria-disabled={!url}
-        aria-label={playing ? "Pause" : "Play"}
-        title={playing ? "Pause" : "Play"}
-        onClick={toggle}
-        onKeyDown={onKeyDown}
-        className={`shrink-0 rounded-full p-0.5 text-slate-500 hover:bg-slate-200 ${!url ? "cursor-not-allowed opacity-40" : "cursor-pointer"}`}
-      >
-        {playing ? (
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-            <path d="M5.75 3a.75.75 0 0 0-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 0 0 .75-.75V3.75A.75.75 0 0 0 7.25 3h-1.5zM12.75 3a.75.75 0 0 0-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 0 0 .75-.75V3.75a.75.75 0 0 0-.75-.75h-1.5z" />
-          </svg>
-        ) : (
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-            <path d="M7 4a3 3 0 0 1 6 0v6a3 3 0 1 1-6 0V4z" />
-            <path d="M5.5 9.643a.75.75 0 0 0-1.5 0V10c0 3.06 2.29 5.585 5.25 5.954V17.5h-1.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-1.5v-1.546A6.001 6.001 0 0 0 16 10v-.357a.75.75 0 0 0-1.5 0V10a4.5 4.5 0 0 1-9 0v-.357z" />
-          </svg>
-        )}
-      </span>
-    </>
-  );
-}
-
-interface AssetSelectProps {
-  value: string | undefined;
-  assetType: "image" | "audio";
-  options: AssetItem[];
-  onChange: (id: string | undefined) => void;
-}
-
-function AssetSelect({ value, assetType, options, onChange }: AssetSelectProps) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const selected = options.find((o) => o.id === value);
-
-  const MicIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0 text-slate-400">
-      <path d="M7 4a3 3 0 0 1 6 0v6a3 3 0 1 1-6 0V4z" />
-      <path d="M5.5 9.643a.75.75 0 0 0-1.5 0V10c0 3.06 2.29 5.585 5.25 5.954V17.5h-1.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-1.5v-1.546A6.001 6.001 0 0 0 16 10v-.357a.75.75 0 0 0-1.5 0V10a4.5 4.5 0 0 1-9 0v-.357z" />
-    </svg>
-  );
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 rounded border border-slate-300 bg-white px-2 py-1 text-left text-sm hover:bg-slate-50"
-      >
-        {selected ? (
-          <>
-            {assetType === "image" && (
-              <img src={selected.url || undefined} alt="" className="h-5 w-5 shrink-0 rounded bg-slate-100 object-cover" />
-            )}
-            {assetType === "audio" && <MicIcon />}
-            <span className="flex-1 truncate text-slate-700">{selected.prompt || selected.id}</span>
-            <span className="shrink-0 font-mono text-xs text-slate-400">{selected.id}</span>
-          </>
-        ) : (
-          <span className="flex-1 text-slate-400">— none —</span>
-        )}
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0 text-slate-400">
-          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06z" clipRule="evenodd" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute z-50 mt-1 max-h-52 w-full overflow-auto rounded border border-slate-200 bg-white shadow-lg">
-          <button
-            type="button"
-            onClick={() => { onChange(undefined); setOpen(false); }}
-            className="flex w-full items-center px-2 py-1.5 text-sm text-slate-400 hover:bg-slate-50"
-          >
-            — none —
-          </button>
-          {options.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => { onChange(opt.id); setOpen(false); }}
-              className="flex w-full items-center gap-2 px-2 py-1.5 text-sm hover:bg-blue-50"
-            >
-              {assetType === "image" && (
-                <img src={opt.url || undefined} alt="" className="h-7 w-7 shrink-0 rounded bg-slate-100 object-cover" />
-              )}
-              {assetType === "audio" && <AudioInlinePlay url={opt.url} />}
-              <span className="flex-1 truncate text-slate-700">{opt.prompt || opt.id}</span>
-              <span className="shrink-0 font-mono text-xs text-slate-400">{opt.id}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 interface QuestionListEditorProps {
   questions: Question[];
   onChange: (next: Question[]) => void;
-  imageAssets: AssetItem[];
-  audioAssets: AssetItem[];
+  imageAssets: AssetSelectItem[];
+  audioAssets: AssetSelectItem[];
+  onCreateImageAsset: (asset: AssetSelectItem) => void;
+  onCreateAudioAsset: (asset: AssetSelectItem) => void;
 }
 
-function QuestionListEditor({ questions, onChange, imageAssets, audioAssets }: QuestionListEditorProps) {
+function QuestionListEditor({
+  questions,
+  onChange,
+  imageAssets,
+  audioAssets,
+  onCreateImageAsset,
+  onCreateAudioAsset,
+}: QuestionListEditorProps) {
   const { isTargetMode } = useContext(TargetLangContext);
   const updateQuestion = (idx: number, next: Question) => {
     const copy = [...questions];
@@ -406,10 +273,13 @@ function QuestionListEditor({ questions, onChange, imageAssets, audioAssets }: Q
               <label className="flex flex-col gap-1 text-sm">
                 <span className="text-slate-600">Audio asset</span>
                 <AssetSelect
+                  type="audio"
                   value={q.stem.audioAssetId}
-                  assetType="audio"
                   options={audioAssets}
                   onChange={(id) => updateQuestion(idx, { ...q, stem: { audioAssetId: id } })}
+                  allowAddAsset={!isTargetMode}
+                  disabled={isTargetMode}
+                  onCreateAsset={onCreateAudioAsset}
                 />
               </label>
             )}
@@ -452,10 +322,13 @@ function QuestionListEditor({ questions, onChange, imageAssets, audioAssets }: Q
                   </div>
                   {q.type === "text_image" ? (
                     <AssetSelect
+                      type="image"
                       value={opt.imageAssetId}
-                      assetType="image"
                       options={imageAssets}
                       onChange={(id) => updateOpt({ imageAssetId: id })}
+                      allowAddAsset={!isTargetMode}
+                      disabled={isTargetMode}
+                      onCreateAsset={onCreateImageAsset}
                     />
                   ) : (
                     <TLInput
@@ -516,18 +389,6 @@ function QuestionListEditor({ questions, onChange, imageAssets, audioAssets }: Q
 }
 
 // ── Assets Editor ────────────────────────────────────────────────────────────
-
-function genAssetId(prefix: string, existing: string[]): string {
-  let id: string;
-  do {
-    id = `${prefix}_${Math.random().toString(16).slice(2, 12).padEnd(10, "0")}`;
-  } while (existing.includes(id));
-  return id;
-}
-
-function isDataUrl(url: string): boolean {
-  return url.startsWith("data:");
-}
 
 function ImagePreview({ url }: { url: string }) {
   const [broken, setBroken] = useState(false);
@@ -613,8 +474,8 @@ function AudioPreview({ url }: { url: string }) {
 interface AssetSectionProps {
   label: string;
   assetType: "image" | "audio";
-  items: AssetItem[];
-  onChange: (next: AssetItem[]) => void;
+  items: AssetSelectItem[];
+  onChange: (next: AssetSelectItem[]) => void;
 }
 
 function AssetSection({ label, assetType, items, onChange }: AssetSectionProps) {
@@ -632,7 +493,7 @@ function AssetSection({ label, assetType, items, onChange }: AssetSectionProps) 
 
   const removeItem = (idx: number) => onChange(items.filter((_, i) => i !== idx));
 
-  const updateItem = (idx: number, patch: Partial<AssetItem>) => {
+  const updateItem = (idx: number, patch: Partial<AssetSelectItem>) => {
     const next = [...items];
     next[idx] = { ...next[idx], ...patch };
     onChange(next);
@@ -779,10 +640,10 @@ function AssetsEditor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
   const { isTargetMode } = useContext(TargetLangContext);
   const { assets } = task.taskModel;
 
-  const toItems = (dict: Record<string, { prompt?: string; url?: string }>): AssetItem[] =>
+  const toItems = (dict: Record<string, { prompt?: string; url?: string }>): AssetSelectItem[] =>
     Object.entries(dict).map(([id, a]) => ({ id, prompt: a.prompt ?? "", url: a.url ?? "" }));
 
-  const toDict = (items: AssetItem[]): Record<string, { prompt?: string; url?: string }> =>
+  const toDict = (items: AssetSelectItem[]): Record<string, { prompt?: string; url?: string }> =>
     Object.fromEntries(
       items.map(({ id, prompt, url }) => [
         id,
@@ -796,13 +657,13 @@ function AssetsEditor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
   const imagesArr = toItems(assets.images ?? {});
   const audiosArr = toItems(assets.audios ?? {});
 
-  const updateImages = (next: AssetItem[]) =>
+  const updateImages = (next: AssetSelectItem[]) =>
     setTask({
       ...task,
       taskModel: { ...task.taskModel, assets: { ...assets, images: toDict(next) } },
     });
 
-  const updateAudios = (next: AssetItem[]) =>
+  const updateAudios = (next: AssetSelectItem[]) =>
     setTask({
       ...task,
       taskModel: { ...task.taskModel, assets: { ...assets, audios: toDict(next) } },
@@ -945,6 +806,7 @@ function dialoguesEditorRoleId(r: { id?: string }, index: number): string {
 }
 
 function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
+  const { isTargetMode } = useContext(TargetLangContext);
   const dialogues = task.taskModel.dialogues ?? [];
   const audios = taskAudioAssets(task);
   const roles = task.taskModel.roles ?? [];
@@ -1133,10 +995,13 @@ function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: Ta
                   <label className="flex flex-col gap-1 text-sm md:col-span-3">
                     <span className="font-medium text-slate-700">Audio asset</span>
                     <AssetSelect
+                      type="audio"
                       value={turn.audioAssetId}
-                      assetType="audio"
                       options={audios}
                       onChange={(id) => updateTurn(di, ti, { ...turn, audioAssetId: id })}
+                      allowAddAsset={!isTargetMode}
+                      disabled={isTargetMode}
+                      onCreateAsset={(a) => setTask(appendTaskAsset(task, "audio", a))}
                     />
                   </label>
                 </div>
@@ -1171,6 +1036,7 @@ function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: Ta
 }
 
 function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
+  const { isTargetMode } = useContext(TargetLangContext);
   const { phase, index } = findPhase(task, "phase1");
   if (!phase) return <p className="text-sm text-slate-500">Phase "phase1" not found.</p>;
   const step = phase.steps[0] as Phase1EntryStep | undefined;
@@ -1190,10 +1056,13 @@ function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
         <label className="flex flex-col gap-1 text-sm md:col-span-2">
           <span className="font-medium text-slate-700">Thumbnail</span>
           <AssetSelect
+            type="image"
             value={step.thumbnail}
-            assetType="image"
             options={taskImageAssets(task)}
             onChange={(id) => updateStep({ ...step, thumbnail: id })}
+            allowAddAsset={!isTargetMode}
+            disabled={isTargetMode}
+            onCreateAsset={(a) => setTask(appendTaskAsset(task, "image", a))}
           />
         </label>
         <label className="flex flex-col gap-1 text-sm md:col-span-2">
@@ -1287,15 +1156,31 @@ function Phase2Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
           onChange={(next) => updateStep({ ...step, warmupQuestions: next })}
           imageAssets={taskImageAssets(task)}
           audioAssets={taskAudioAssets(task)}
+          onCreateImageAsset={(a) => setTask(appendTaskAsset(task, "image", a))}
+          onCreateAudioAsset={(a) => setTask(appendTaskAsset(task, "audio", a))}
         />
       </div>
     </div>
   );
 }
 
-function Phase3Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
+function Phase3Editor({
+  task,
+  setTask,
+  onCreateImageAsset: onCreateImageProp,
+  onCreateAudioAsset: onCreateAudioProp,
+}: {
+  task: TaskPackage;
+  setTask: (t: TaskPackage) => void;
+  /** When embedding Phase 3 UI (e.g. phase 5), attach new assets to the real task */
+  onCreateImageAsset?: (a: AssetSelectItem) => void;
+  onCreateAudioAsset?: (a: AssetSelectItem) => void;
+}) {
   const { phase, index } = findPhase(task, "phase3");
   if (!phase) return <p className="text-sm text-slate-500">Phase "phase3" not found.</p>;
+
+  const onCreateImageAsset = onCreateImageProp ?? ((a: AssetSelectItem) => setTask(appendTaskAsset(task, "image", a)));
+  const onCreateAudioAsset = onCreateAudioProp ?? ((a: AssetSelectItem) => setTask(appendTaskAsset(task, "audio", a)));
 
   const updatePhase = (nextPhase: Phase) => {
     const phases = [...task.phases];
@@ -1378,6 +1263,8 @@ function Phase3Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
               onChange={(nextQs) => updateQuestionsForKey(key, nextQs)}
               imageAssets={taskImageAssets(task)}
               audioAssets={taskAudioAssets(task)}
+              onCreateImageAsset={onCreateImageAsset}
+              onCreateAudioAsset={onCreateAudioAsset}
             />
           </div>
         ))}
@@ -1806,6 +1693,8 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                 wordQuestions: ws.wordQuestions,
               }));
             }}
+            onCreateImageAsset={(a) => setTask(appendTaskAsset(task, "image", a))}
+            onCreateAudioAsset={(a) => setTask(appendTaskAsset(task, "audio", a))}
           />
         </div>
       )}
