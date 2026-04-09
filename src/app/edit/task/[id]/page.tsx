@@ -33,6 +33,14 @@ import { normalizeTaskPackage } from "@/lib/normalize-task-package";
 import { AudioRecordModal } from "@/components/AudioRecordModal";
 import { AssetSelect, type AssetSelectItem } from "@/components/AssetSelect";
 import { genAssetId, isDataUrl } from "@/lib/asset-utils";
+import {
+  editorAddPrimaryButton,
+  editorAddPrimaryButtonSm,
+  editorLabelL1,
+  editorLabelL2,
+  editorLabelL2Inline,
+  editorLabelL3,
+} from "@/app/edit/editor-labels";
 
 type TabKey =
   | "info"
@@ -201,10 +209,13 @@ function QuestionListEditor({
   return (
     <div className="space-y-4">
       {questions.map((q, idx) => (
-        <div key={idx} className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+        <div
+          key={idx}
+          className="space-y-3 rounded-lg border border-slate-200 border-t-[3px] border-t-violet-400/90 bg-white p-4 shadow-sm"
+        >
           {/* Header */}
-          <div className="flex items-center justify-between">
-            <p className="font-medium text-slate-800">Question {idx + 1}</p>
+          <div className="flex items-center justify-between gap-2">
+            <span className={editorLabelL3}>Question {idx + 1}</span>
             {!isTargetMode && (
               <button type="button" onClick={() => removeQuestion(idx)} className="text-sm text-red-600 hover:underline">
                 Remove
@@ -215,7 +226,7 @@ function QuestionListEditor({
           {/* Type + Guidance */}
           <div className="grid gap-3 md:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-slate-700">Type</span>
+              <span className={editorLabelL2Inline}>Type</span>
               <select
                 value={q.type}
                 disabled={isTargetMode}
@@ -232,7 +243,7 @@ function QuestionListEditor({
             {false && (
               <>
                 <label className="flex flex-col gap-1 text-sm">
-                  <span className="font-medium text-slate-700">Guidance purpose (optional)</span>
+                  <span className={editorLabelL2Inline}>Guidance purpose (optional)</span>
                   <input
                     type="text"
                     value={q.guidance?.purpose ?? ""}
@@ -243,7 +254,7 @@ function QuestionListEditor({
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-sm md:col-span-2">
-                  <span className="font-medium text-slate-700">Guidance description (optional)</span>
+                  <span className={editorLabelL2Inline}>Guidance description (optional)</span>
                   <textarea
                     value={q.guidance?.description ?? ""}
                     onChange={(e) =>
@@ -259,7 +270,7 @@ function QuestionListEditor({
 
           {/* Stem */}
           <div className="space-y-1.5">
-            <p className="text-sm font-medium text-slate-700">Stem</p>
+            <p className={editorLabelL2}>Stem</p>
             {q.type !== "audio_text" ? (
               <label className="flex flex-col gap-1 text-sm">
                 <span className="text-slate-600">Text</span>
@@ -287,7 +298,7 @@ function QuestionListEditor({
 
           {/* Options */}
           <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-700">Options</p>
+            <p className={editorLabelL2}>Options</p>
             {q.options.map((opt, oIdx) => {
               const isCorrect = q.correctOptionIndexes.includes(oIdx);
               const toggleCorrect = () => {
@@ -312,7 +323,7 @@ function QuestionListEditor({
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-2 text-sm">
                       <input type="checkbox" checked={isCorrect} onChange={toggleCorrect} disabled={isTargetMode} className="h-4 w-4" />
-                      <span className="font-medium text-slate-700">Correct</span>
+                      <span className={editorLabelL2Inline}>Correct</span>
                     </label>
                     {!isTargetMode && (
                       <button type="button" onClick={removeOpt} className="text-xs text-red-600 hover:underline">
@@ -356,7 +367,7 @@ function QuestionListEditor({
                   const newOpt = q.type === "text_image" ? {} : { text: "" };
                   updateQuestion(idx, { ...q, options: [...q.options, newOpt] });
                 }}
-                className="text-sm text-blue-600 hover:underline"
+                className={editorAddPrimaryButtonSm}
               >
                 Add option
               </button>
@@ -365,7 +376,7 @@ function QuestionListEditor({
 
           {/* Hint */}
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-slate-700">Hint (optional)</span>
+            <span className={editorLabelL2Inline}>Hint (optional)</span>
             <TLInput
               type="text"
               value={q.hint ?? ""}
@@ -379,7 +390,7 @@ function QuestionListEditor({
         <button
           type="button"
           onClick={addQuestion}
-          className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className={editorAddPrimaryButton}
         >
           Add question
         </button>
@@ -527,7 +538,7 @@ function AssetSection({ label, assetType, items, onChange }: AssetSectionProps) 
 
   return (
     <div className="space-y-3">
-      <p className="font-semibold text-slate-800">{label}</p>
+      <p className={editorLabelL1}>{label}</p>
       <input ref={fileInputRef} type="file" accept={accept} className="hidden" onChange={handleFileChange} />
 
       {items.length === 0 && (
@@ -563,7 +574,7 @@ function AssetSection({ label, assetType, items, onChange }: AssetSectionProps) 
               {/* Fields */}
               <div className="flex flex-1 flex-col gap-2">
                 <label className="flex flex-col gap-1 text-sm">
-                  <span className="font-medium text-slate-700">Prompt</span>
+                  <span className={editorLabelL2Inline}>Prompt</span>
                   <textarea
                     value={item.prompt}
                     onChange={(e) => updateItem(idx, { prompt: e.target.value })}
@@ -574,7 +585,7 @@ function AssetSection({ label, assetType, items, onChange }: AssetSectionProps) 
                 </label>
 
                 <label className="flex flex-col gap-1 text-sm">
-                  <span className="font-medium text-slate-700">URL</span>
+                  <span className={editorLabelL2Inline}>URL</span>
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
@@ -617,7 +628,7 @@ function AssetSection({ label, assetType, items, onChange }: AssetSectionProps) 
       <button
         type="button"
         onClick={addItem}
-        className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        className={editorAddPrimaryButton}
       >
         Add {assetType}
       </button>
@@ -737,7 +748,7 @@ function TltSection({ label, items, prefix, onChange }: TltSectionProps) {
 
   return (
     <div className="space-y-3">
-      <p className="font-semibold text-slate-800">{label}</p>
+      <p className={editorLabelL1}>{label}</p>
       {items.length === 0 && (
         <p className="text-sm italic text-slate-400">No {label.toLowerCase()} yet.</p>
       )}
@@ -763,7 +774,7 @@ function TltSection({ label, items, prefix, onChange }: TltSectionProps) {
       <button
         type="button"
         onClick={addItem}
-        className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        className={editorAddPrimaryButton}
       >
         Add {singular}
       </button>
@@ -874,9 +885,12 @@ function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: Ta
         <p className="text-sm italic text-slate-400">No dialogues yet. Add one to attach subtask or roleplay flows.</p>
       )}
       {dialogues.map((dlg, di) => (
-        <div key={dlg.id} className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+        <div
+          key={dlg.id}
+          className="space-y-4 rounded-xl border border-slate-200 border-l-4 border-l-violet-400 bg-slate-50/80 p-4 shadow-sm"
+        >
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="font-semibold text-slate-800">Dialogue {di + 1}</p>
+            <span className={editorLabelL3}>Dialogue {di + 1}</span>
             <button
               type="button"
               onClick={() => removeDialogue(di)}
@@ -887,7 +901,7 @@ function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: Ta
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="flex flex-col gap-1 text-sm min-w-0">
-              <span className="font-medium text-slate-700">Id</span>
+              <span className={editorLabelL2Inline}>Id</span>
               <input
                 type="text"
                 value={dlg.id}
@@ -896,7 +910,7 @@ function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: Ta
               />
             </label>
             <label className="flex flex-col gap-1 text-sm min-w-0">
-              <span className="font-medium text-slate-700">Scope</span>
+              <span className={editorLabelL2Inline}>Scope</span>
               <select
                 value={dlg.scope === "full_task" ? "full_task" : "subtask"}
                 onChange={(e) => {
@@ -944,7 +958,7 @@ function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: Ta
           </div>
 
           <div className="space-y-3">
-            <p className="text-sm font-medium text-slate-700">Turns</p>
+            <p className={editorLabelL2}>Turns</p>
             {dlg.turns.length === 0 && (
               <p className="text-sm text-slate-500">No turns — add at least one line of dialogue.</p>
             )}
@@ -956,7 +970,7 @@ function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: Ta
                 <span className="shrink-0 pt-2 text-xs text-slate-400 md:w-6">{ti + 1}.</span>
                 <div className="grid min-w-0 flex-1 gap-2 md:grid-cols-3">
                   <label className="flex flex-col gap-1 text-sm">
-                    <span className="font-medium text-slate-700">Role</span>
+                    <span className={editorLabelL2Inline}>Role</span>
                     {roles.length === 0 ? (
                       <p className="text-xs text-amber-700">Add roles under Info (task model) to choose speaker roles.</p>
                     ) : null}
@@ -985,7 +999,7 @@ function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: Ta
                     ) : null}
                   </label>
                   <label className="flex flex-col gap-1 text-sm md:col-span-2">
-                    <span className="font-medium text-slate-700">Text</span>
+                    <span className={editorLabelL2Inline}>Text</span>
                     <TLInput
                       value={turn.text}
                       onChange={(e) => updateTurn(di, ti, { ...turn, text: e.target.value })}
@@ -993,7 +1007,7 @@ function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: Ta
                     />
                   </label>
                   <label className="flex flex-col gap-1 text-sm md:col-span-3">
-                    <span className="font-medium text-slate-700">Audio asset</span>
+                    <span className={editorLabelL2Inline}>Audio asset</span>
                     <AssetSelect
                       type="audio"
                       value={turn.audioAssetId}
@@ -1017,7 +1031,7 @@ function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: Ta
             <button
               type="button"
               onClick={() => addTurn(di)}
-              className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className={editorAddPrimaryButton}
             >
               Add turn
             </button>
@@ -1027,7 +1041,7 @@ function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: Ta
       <button
         type="button"
         onClick={addDialogue}
-        className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        className={editorAddPrimaryButton}
       >
         Add dialogue
       </button>
@@ -1054,7 +1068,7 @@ function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm md:col-span-2">
-          <span className="font-medium text-slate-700">Thumbnail</span>
+          <span className={editorLabelL2Inline}>Thumbnail</span>
           <AssetSelect
             type="image"
             value={step.thumbnail}
@@ -1066,7 +1080,7 @@ function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
           />
         </label>
         <label className="flex flex-col gap-1 text-sm md:col-span-2">
-          <span className="font-medium text-slate-700">Task purpose</span>
+          <span className={editorLabelL2Inline}>Task purpose</span>
           <TLTextarea
             value={step.guidance?.purpose ?? ""}
             onChange={(e) =>
@@ -1079,7 +1093,7 @@ function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
           />
         </label>
         <label className="flex flex-col gap-1 text-sm md:col-span-2">
-          <span className="font-medium text-slate-700">Task description</span>
+          <span className={editorLabelL2Inline}>Task description</span>
           <TLTextarea
             value={step.guidance?.description ?? ""}
             onChange={(e) =>
@@ -1092,7 +1106,7 @@ function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-slate-700">Button text</span>
+          <span className={editorLabelL2Inline}>Button text</span>
           <TLInput
             type="text"
             value={step.callToActionText}
@@ -1122,7 +1136,7 @@ function Phase2Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-slate-700">Step guidance purpose</span>
+          <span className={editorLabelL2Inline}>Step guidance purpose</span>
           <TLInput
             type="text"
             value={step.guidance?.purpose ?? ""}
@@ -1135,7 +1149,7 @@ function Phase2Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
           />
         </label>
         <label className="flex flex-col gap-1 text-sm md:col-span-2">
-          <span className="font-medium text-slate-700">Step guidance description</span>
+          <span className={editorLabelL2Inline}>Step guidance description</span>
           <TLTextarea
             value={step.guidance?.description ?? ""}
             onChange={(e) =>
@@ -1150,7 +1164,7 @@ function Phase2Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
       </div>
 
       <div className="space-y-3">
-        <p className="font-medium text-slate-800">Warmup questions</p>
+        <p className={editorLabelL1}>Warmup questions</p>
         <QuestionListEditor
           questions={step.warmupQuestions ?? []}
           onChange={(next) => updateStep({ ...step, warmupQuestions: next })}
@@ -1164,17 +1178,28 @@ function Phase2Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
   );
 }
 
+/** Optional copy when Phase3Editor is embedded for Phase 5 words (`wordQuestions` is still keyed by word id). */
+type Phase3WordGroupCopy = {
+  sectionLabel: string;
+  itemIdLabel: string;
+  addGroupLabel: string;
+  removeGroupLabel: string;
+};
+
 function Phase3Editor({
   task,
   setTask,
   onCreateImageAsset: onCreateImageProp,
   onCreateAudioAsset: onCreateAudioProp,
+  wordGroupCopy,
 }: {
   task: TaskPackage;
   setTask: (t: TaskPackage) => void;
   /** When embedding Phase 3 UI (e.g. phase 5), attach new assets to the real task */
   onCreateImageAsset?: (a: AssetSelectItem) => void;
   onCreateAudioAsset?: (a: AssetSelectItem) => void;
+  /** Phase 5 words: use “Words” / “Word ID” instead of duplicate “Phase 5” + “Word questions” + “Item”. */
+  wordGroupCopy?: Phase3WordGroupCopy;
 }) {
   const { phase, index } = findPhase(task, "phase3");
   if (!phase) return <p className="text-sm text-slate-500">Phase "phase3" not found.</p>;
@@ -1204,8 +1229,12 @@ function Phase3Editor({
   const renderGroupedQuestions = (
     label: string,
     map: Record<string, Question[]>,
-    onChange: (next: Record<string, Question[]>) => void
+    onChange: (next: Record<string, Question[]>) => void,
+    groupUi?: { idLabel: string; add: string; remove: string }
   ) => {
+    const idLabel = groupUi?.idLabel ?? "Item ID";
+    const addLabel = groupUi?.add ?? "Add item";
+    const removeLabel = groupUi?.remove ?? "Remove item";
     const entries = Object.entries(map);
     const addKey = () => {
       let i = 1;
@@ -1237,12 +1266,15 @@ function Phase3Editor({
 
     return (
       <div className="space-y-3">
-        <p className="font-medium text-slate-800">{label}</p>
+        <p className={editorLabelL1}>{label}</p>
         {entries.map(([key, qs]) => (
-          <div key={key} className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <div
+            key={key}
+            className="space-y-2 rounded-lg border border-teal-200/90 border-l-[3px] border-l-teal-500 bg-gradient-to-br from-teal-50/40 to-slate-50 p-3 shadow-sm"
+          >
             <div className="flex items-center justify-between gap-3">
               <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-slate-700">Item ID</span>
+                <span className={editorLabelL2Inline}>{idLabel}</span>
                 <input
                   type="text"
                   value={key}
@@ -1255,7 +1287,7 @@ function Phase3Editor({
                 onClick={() => removeKey(key)}
                 className="text-sm text-red-600 hover:underline"
               >
-                Remove item
+                {removeLabel}
               </button>
             </div>
             <QuestionListEditor
@@ -1271,26 +1303,35 @@ function Phase3Editor({
         <button
           type="button"
           onClick={addKey}
-          className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className={editorAddPrimaryButton}
         >
-          Add item
+          {addLabel}
         </button>
       </div>
     );
   };
+
+  const wordGroupUi = wordGroupCopy
+    ? {
+        idLabel: wordGroupCopy.itemIdLabel,
+        add: wordGroupCopy.addGroupLabel,
+        remove: wordGroupCopy.removeGroupLabel,
+      }
+    : undefined;
 
   return (
     <div className="space-y-6">
       {wordsStep && (
         <div className="space-y-3">
           {renderGroupedQuestions(
-            "Word questions",
+            wordGroupCopy?.sectionLabel ?? "Word questions",
             wordsStep.wordQuestions ?? {},
             (next) =>
               updateStepAt(
                 phase.steps.findIndex((s) => s.type === "phase3_words"),
                 { ...wordsStep, wordQuestions: next }
-              )
+              ),
+            wordGroupUi
           )}
         </div>
       )}
@@ -1384,10 +1425,13 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
 
       <div className="space-y-3">
         {subtasks.map((st, i) => (
-          <div key={i} className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+          <div
+            key={i}
+            className="space-y-3 rounded-lg border border-slate-200 border-l-4 border-l-amber-400 bg-white p-4 shadow-sm"
+          >
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="font-medium text-slate-800">Subtask {i + 1}</p>
+                <p className={editorLabelL3}>Subtask {i + 1}</p>
                 <p className="mt-0.5 font-mono text-xs text-slate-500" title="Stored on save; not editable">
                   ID: {st.subtaskId || "…"}
                 </p>
@@ -1406,7 +1450,7 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
 
             <div className="grid gap-3 md:grid-cols-2">
               <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-slate-700">Dialogue</span>
+                <span className={editorLabelL2Inline}>Dialogue</span>
                 <select
                   value={st.dialogueId}
                   onChange={(e) => {
@@ -1434,7 +1478,7 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                 ) : null}
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-slate-700">Allowed roles (comma-separated)</span>
+                <span className={editorLabelL2Inline}>Allowed roles (comma-separated)</span>
                 <input
                   type="text"
                   value={st.allowedRoles.join(", ")}
@@ -1475,7 +1519,7 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
 
               return (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-slate-700">Dialogue — distractor turns</p>
+                  <p className={editorLabelL2}>Dialogue — distractor turns</p>
                   <p className="text-xs text-slate-500">
                     Each line is one speak turn (index matches task JSON). Click + to edit distractor options for that
                     turn.
@@ -1596,7 +1640,7 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                                     subtasksNext[i] = { ...st, dialogDistractors: dsNext };
                                     updateStep({ ...step, subtasks: subtasksNext });
                                   }}
-                                  className="text-xs text-blue-600 hover:underline"
+                                  className={editorAddPrimaryButtonSm}
                                 >
                                   Add option
                                 </button>
@@ -1631,7 +1675,7 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
             ],
           });
         }}
-        className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        className={editorAddPrimaryButton}
       >
         Add subtask
       </button>
@@ -1669,8 +1713,13 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
     <div className="space-y-6">
       {wordsStep && (
         <div className="space-y-3">
-          <p className="font-medium text-slate-800">Phase 5 words</p>
           <Phase3Editor
+            wordGroupCopy={{
+              sectionLabel: "Words",
+              itemIdLabel: "Word ID",
+              addGroupLabel: "Add word",
+              removeGroupLabel: "Remove word",
+            }}
             task={{
               ...task,
               phases: [
@@ -1701,13 +1750,16 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
 
       {phrasesStep && (
         <div className="space-y-3">
-          <p className="font-medium text-slate-800">Phase 5 phrase clozes</p>
+          <p className={editorLabelL1}>Phrases</p>
           <div className="space-y-3">
             {Object.entries(phrasesStep.phraseClozes ?? {}).map(([phraseId, entry], idx) => (
-              <div key={phraseId} className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
+              <div
+                key={phraseId}
+                className="space-y-2 rounded-lg border border-slate-200 border-l-4 border-l-teal-500 bg-white p-4 shadow-sm"
+              >
                 <div className="flex items-center justify-between gap-2">
                   <label className="flex flex-col gap-1 text-sm">
-                    <span className="font-medium text-slate-700">Phrase ID</span>
+                    <span className={editorLabelL2Inline}>Phrase ID</span>
                     <input
                       type="text"
                       value={phraseId}
@@ -1742,7 +1794,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   </button>
                 </div>
                 <label className="flex flex-col gap-1 text-sm">
-                  <span className="font-medium text-slate-700">Answer</span>
+                  <span className={editorLabelL2Inline}>Answer</span>
                   <input
                     type="text"
                     value={entry.answer}
@@ -1759,7 +1811,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-sm">
-                  <span className="font-medium text-slate-700">Text hint</span>
+                  <span className={editorLabelL2Inline}>Text hint</span>
                   <input
                     type="text"
                     value={entry.textHint ?? ""}
@@ -1776,7 +1828,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-sm">
-                  <span className="font-medium text-slate-700">Audio hint asset ID</span>
+                  <span className={editorLabelL2Inline}>Audio hint asset ID</span>
                   <input
                     type="text"
                     value={entry.audioHint ?? ""}
@@ -1793,7 +1845,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   />
                 </label>
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-slate-700">Sentences (one per round)</p>
+                  <p className={editorLabelL2}>Sentences (one per round)</p>
                   {(entry.sentences ?? []).map((s, sIdx) => (
                     <div key={sIdx} className="flex items-center gap-2">
                       <span className="text-xs text-slate-500 w-14">Round {sIdx + 1}</span>
@@ -1843,7 +1895,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                         },
                       }));
                     }}
-                    className="text-sm text-blue-600 hover:underline"
+                    className={editorAddPrimaryButtonSm}
                   >
                     Add sentence
                   </button>
@@ -1868,7 +1920,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   },
                 }));
               }}
-              className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className={editorAddPrimaryButton}
             >
               Add phrase cloze
             </button>
@@ -1878,7 +1930,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
 
       {sentencesStep && (
         <div className="space-y-3">
-          <p className="font-medium text-slate-800">Phase 5 sentences</p>
+          <p className={editorLabelL1}>Sentences</p>
           <div className="space-y-2">
             {(sentencesStep.sentences ?? []).map((s, idx) => (
               <div key={idx} className="flex items-center gap-2">
@@ -1917,7 +1969,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   sentences: [...(cur.sentences ?? []), ""],
                 }))
               }
-              className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className={editorAddPrimaryButton}
             >
               Add sentence
             </button>
@@ -1973,9 +2025,12 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
       </p>
       <div className="space-y-3">
         {roleplays.map((rp, i) => (
-          <div key={i} className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+          <div
+            key={i}
+            className="space-y-3 rounded-lg border border-slate-200 border-l-4 border-l-sky-500 bg-white p-4 shadow-sm"
+          >
             <div className="flex items-center justify-between">
-              <p className="font-medium text-slate-800">Roleplay {i + 1}</p>
+              <p className={editorLabelL3}>Roleplay {i + 1}</p>
               <button
                 type="button"
                 onClick={() => {
@@ -1989,7 +2044,7 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-slate-700">Dialogue</span>
+                <span className={editorLabelL2Inline}>Dialogue</span>
                 <select
                   value={rp.dialogueId}
                   onChange={(e) => {
@@ -2025,7 +2080,7 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                 ) : null}
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-slate-700">Difficulty</span>
+                <span className={editorLabelL2Inline}>Difficulty</span>
                 <input
                   type="text"
                   readOnly
@@ -2038,7 +2093,7 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                 <span className="text-xs text-slate-500">From dialogue; edit in the Dialogues tab.</span>
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-slate-700">Allowed roles (comma-separated)</span>
+                <span className={editorLabelL2Inline}>Allowed roles (comma-separated)</span>
                 <input
                   type="text"
                   value={rp.allowedRoles.join(", ")}
@@ -2056,7 +2111,7 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
               </label>
             </div>
             <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-700">Learner hints by turn</p>
+              <p className={editorLabelL2}>Learner hints by turn</p>
               {(() => {
                 const dlg = dialogues.find((d) => d.id === rp.dialogueId);
                 const turns = dlg?.turns ?? [];
@@ -2227,7 +2282,7 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
             ],
           })
         }
-        className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        className={editorAddPrimaryButton}
       >
         Add roleplay
       </button>
@@ -2349,7 +2404,7 @@ export default function TaskEditPage() {
         return (
           <div className="grid gap-4 md:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-slate-700">Task ID</span>
+              <span className={editorLabelL2Inline}>Task ID</span>
               <input
                 type="text"
                 value={task.id}
@@ -2358,7 +2413,7 @@ export default function TaskEditPage() {
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-slate-700">Title</span>
+              <span className={editorLabelL2Inline}>Title</span>
               <input
                 type="text"
                 value={task.title}
@@ -2367,7 +2422,7 @@ export default function TaskEditPage() {
               />
             </label>
             <label className="flex flex-col gap-1 text-sm md:col-span-2">
-              <span className="font-medium text-slate-700">Description</span>
+              <span className={editorLabelL2Inline}>Description</span>
               <textarea
                 value={task.description}
                 onChange={(e) => setTask({ ...task, description: e.target.value })}

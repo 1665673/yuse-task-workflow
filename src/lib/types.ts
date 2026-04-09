@@ -137,6 +137,7 @@ export interface Phase2WarmupStep extends BaseStep {
 
 export interface Phase3WordsStep extends BaseStep {
   type: "phase3_words";
+  /** Key = word id; value = one or more questions targeting that word. */
   wordQuestions: { [wordId: string]: Question[] };
 }
 
@@ -167,6 +168,7 @@ export interface Phase4SubtasksStep extends BaseStep {
 
 export interface Phase5WordsStep extends BaseStep {
   type: "phase5_words";
+  /** Key = vocabulary / content id; value = quiz questions for that word (same shape as phase3_words). */
   wordQuestions: { [wordId: string]: Question[] };
 }
 
