@@ -390,6 +390,34 @@ export function ensurePhase4SubtaskIds(subtasks: Phase4SubtaskEntry[]): Phase4Su
   });
 }
 
+/**
+ * Sets each dialogue's `subtaskId` from Phase 4 only: the subtask row whose `dialogueId` matches this dialogue's `id`.
+ * Dialogues not referenced by any Phase 4 subtask have `subtaskId` cleared.
+ */
+export function syncDialogueSubtaskIdsFromPhase4(task: TaskPackage): TaskPackage {
+  const phase4 = task.phases.find((p) => p.type === "subtask_learning");
+  const step = phase4?.steps.find((s) => s.type === "phase4_subtasks") as Phase4SubtasksStep | undefined;
+  const subtasks = step?.subtasks ?? [];
+  const byDialogueId = new Map<string, string>();
+  for (const st of subtasks) {
+    const did = st.dialogueId?.trim();
+    if (!did) continue;
+    byDialogueId.set(did, st.subtaskId);
+  }
+  const dialogues = task.taskModel.dialogues ?? [];
+  const next: Dialogue[] = dialogues.map((d) => {
+    const sid = byDialogueId.get(d.id);
+    if (sid !== undefined) {
+      return { ...d, subtaskId: sid };
+    }
+    return { ...d, subtaskId: undefined };
+  });
+  return {
+    ...task,
+    taskModel: { ...task.taskModel, dialogues: next },
+  };
+}
+
 /** Keeps `difficulty` on each roleplay in sync with the selected dialogue in the task model. */
 export function syncPhase6RoleplayDifficultiesFromDialogues(
   roleplays: Phase6RoleplayEntry[],

@@ -7,6 +7,8 @@ import type {
   TaskPackage,
   Phase,
   Step,
+  Dialogue,
+  DialogueTurn,
   Phase1EntryStep,
   Phase2WarmupStep,
   Phase3WordsStep,
@@ -22,6 +24,7 @@ import {
   ensurePhase4SubtaskIds,
   newPhase4DistractorOptionId,
   newPhase4SubtaskId,
+  syncDialogueSubtaskIdsFromPhase4,
   syncPhase6RoleplayDifficultiesFromDialogues,
 } from "@/lib/task-utils";
 import { authJsonHeaders, authMultipartHeaders } from "@/lib/api";
@@ -32,6 +35,7 @@ type TabKey =
   | "info"
   | "assets"
   | "tlts"
+  | "dialogues"
   | "phase1"
   | "phase2"
   | "phase3"
@@ -155,24 +159,41 @@ function AudioInlinePlay({ url }: { url: string }) {
 
   useEffect(() => () => { audioRef.current?.pause(); }, []);
 
-  const toggle = (e: React.MouseEvent) => {
+  const toggle = (e: React.SyntheticEvent) => {
     e.stopPropagation();
     const el = audioRef.current;
     if (!el || !url) return;
-    if (playing) { el.pause(); setPlaying(false); }
-    else { el.play().then(() => setPlaying(true)).catch(() => {}); }
+    if (playing) {
+      el.pause();
+      setPlaying(false);
+    } else {
+      el.play().then(() => setPlaying(true)).catch(() => {});
+    }
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (!url) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      e.stopPropagation();
+      toggle(e);
+    }
   };
 
   return (
     <>
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio ref={audioRef} src={url || undefined} onEnded={() => setPlaying(false)} />
-      <button
-        type="button"
-        onClick={toggle}
-        disabled={!url}
+      {/* span, not button — avoids invalid <button> inside AssetSelect option rows */}
+      <span
+        role="button"
+        tabIndex={url ? 0 : -1}
+        aria-disabled={!url}
+        aria-label={playing ? "Pause" : "Play"}
         title={playing ? "Pause" : "Play"}
-        className="shrink-0 rounded-full p-0.5 text-slate-500 hover:bg-slate-200 disabled:opacity-40"
+        onClick={toggle}
+        onKeyDown={onKeyDown}
+        className={`shrink-0 rounded-full p-0.5 text-slate-500 hover:bg-slate-200 ${!url ? "cursor-not-allowed opacity-40" : "cursor-pointer"}`}
       >
         {playing ? (
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
@@ -184,7 +205,7 @@ function AudioInlinePlay({ url }: { url: string }) {
             <path d="M5.5 9.643a.75.75 0 0 0-1.5 0V10c0 3.06 2.29 5.585 5.25 5.954V17.5h-1.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-1.5v-1.546A6.001 6.001 0 0 0 16 10v-.357a.75.75 0 0 0-1.5 0V10a4.5 4.5 0 0 1-9 0v-.357z" />
           </svg>
         )}
-      </button>
+      </span>
     </>
   );
 }
@@ -918,6 +939,237 @@ function TltsEditor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPac
   );
 }
 
+function dialoguesEditorRoleId(r: { id?: string }, index: number): string {
+  const t = r.id?.trim();
+  return t || `role-${index + 1}`;
+}
+
+function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
+  const dialogues = task.taskModel.dialogues ?? [];
+  const audios = taskAudioAssets(task);
+  const roles = task.taskModel.roles ?? [];
+  const roleIds = roles.map((r, i) => dialoguesEditorRoleId(r, i));
+  const defaultRoleId = roles.length ? dialoguesEditorRoleId(roles[0], 0) : "user";
+
+  const setDialogues = (next: Dialogue[]) => {
+    setTask({ ...task, taskModel: { ...task.taskModel, dialogues: next } });
+  };
+
+  const normalizeDialogueDifficulty = (d: Dialogue): Dialogue =>
+    d.scope === "full_task" ? d : { ...d, difficulty: undefined };
+
+  const updateDialogue = (i: number, d: Dialogue) => {
+    const next = [...dialogues];
+    next[i] = normalizeDialogueDifficulty(d);
+    setDialogues(next);
+  };
+
+  const addDialogue = () => {
+    setDialogues([
+      ...dialogues,
+      {
+        id: `dlg_${Date.now()}`,
+        scope: "subtask",
+        turns: [{ role: defaultRoleId, text: "" }],
+      },
+    ]);
+  };
+
+  const removeDialogue = (i: number) => {
+    setDialogues(dialogues.filter((_, j) => j !== i));
+  };
+
+  const updateTurn = (dialogueIndex: number, turnIndex: number, turn: DialogueTurn) => {
+    const d = dialogues[dialogueIndex];
+    const turns = [...d.turns];
+    turns[turnIndex] = turn;
+    updateDialogue(dialogueIndex, { ...d, turns });
+  };
+
+  const addTurn = (dialogueIndex: number) => {
+    const d = dialogues[dialogueIndex];
+    updateDialogue(dialogueIndex, {
+      ...d,
+      turns: [...d.turns, { role: defaultRoleId, text: "" }],
+    });
+  };
+
+  const removeTurn = (dialogueIndex: number, turnIndex: number) => {
+    const d = dialogues[dialogueIndex];
+    updateDialogue(dialogueIndex, {
+      ...d,
+      turns: d.turns.filter((_, j) => j !== turnIndex),
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <p className="text-sm text-slate-600">
+        Dialogues are referenced by id from Phase 4 (subtasks) and Phase 6 (roleplay). Edit lines and audio assets here;
+        add or remove whole dialogues and turns as needed.
+      </p>
+      {dialogues.length === 0 && (
+        <p className="text-sm italic text-slate-400">No dialogues yet. Add one to attach subtask or roleplay flows.</p>
+      )}
+      {dialogues.map((dlg, di) => (
+        <div key={dlg.id} className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-semibold text-slate-800">Dialogue {di + 1}</p>
+            <button
+              type="button"
+              onClick={() => removeDialogue(di)}
+              className="text-sm text-red-600 hover:underline"
+            >
+              Remove dialogue
+            </button>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="flex flex-col gap-1 text-sm min-w-0">
+              <span className="font-medium text-slate-700">Id</span>
+              <input
+                type="text"
+                value={dlg.id}
+                onChange={(e) => updateDialogue(di, { ...dlg, id: e.target.value })}
+                className="rounded border border-slate-300 px-2 py-1 font-mono text-sm w-full"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm min-w-0">
+              <span className="font-medium text-slate-700">Scope</span>
+              <select
+                value={dlg.scope === "full_task" ? "full_task" : "subtask"}
+                onChange={(e) => {
+                  const scope = e.target.value as "subtask" | "full_task";
+                  updateDialogue(di, {
+                    ...dlg,
+                    scope,
+                    ...(scope === "subtask" ? { difficulty: undefined } : {}),
+                  });
+                }}
+                className="rounded border border-slate-300 bg-white px-2 py-1 text-sm w-full"
+              >
+                <option value="subtask">For Subtask</option>
+                <option value="full_task">For Full Dialogue</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-sm min-w-0">
+              <span
+                className={`font-medium ${dlg.scope === "full_task" ? "text-slate-700" : "text-slate-400"}`}
+              >
+                Difficulty
+              </span>
+              <select
+                disabled={dlg.scope !== "full_task"}
+                value={
+                  dlg.scope === "full_task" &&
+                  (dlg.difficulty === "a" || dlg.difficulty === "b" || dlg.difficulty === "c")
+                    ? dlg.difficulty
+                    : ""
+                }
+                onChange={(e) =>
+                  updateDialogue(di, {
+                    ...dlg,
+                    difficulty: e.target.value ? (e.target.value as "a" | "b" | "c") : undefined,
+                  })
+                }
+                className="rounded border border-slate-300 px-2 py-1 text-sm w-full font-mono disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 bg-white"
+              >
+                <option value="">—</option>
+                <option value="a">a</option>
+                <option value="b">b</option>
+                <option value="c">c</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-slate-700">Turns</p>
+            {dlg.turns.length === 0 && (
+              <p className="text-sm text-slate-500">No turns — add at least one line of dialogue.</p>
+            )}
+            {dlg.turns.map((turn, ti) => (
+              <div
+                key={ti}
+                className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3 md:flex-row md:items-start md:gap-3"
+              >
+                <span className="shrink-0 pt-2 text-xs text-slate-400 md:w-6">{ti + 1}.</span>
+                <div className="grid min-w-0 flex-1 gap-2 md:grid-cols-3">
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium text-slate-700">Role</span>
+                    {roles.length === 0 ? (
+                      <p className="text-xs text-amber-700">Add roles under Info (task model) to choose speaker roles.</p>
+                    ) : null}
+                    <select
+                      value={roleIds.includes(turn.role) ? turn.role : ""}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v) updateTurn(di, ti, { ...turn, role: v });
+                      }}
+                      className="rounded border border-slate-300 bg-white px-2 py-1 text-sm"
+                    >
+                      <option value="">— Select role —</option>
+                      {roles.map((r, ri) => {
+                        const id = dialoguesEditorRoleId(r, ri);
+                        return (
+                          <option key={id} value={id}>
+                            {r.title}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    {turn.role && !roleIds.includes(turn.role) ? (
+                      <span className="text-xs text-amber-700">
+                        Current id &quot;{turn.role}&quot; does not match any role — pick a role above.
+                      </span>
+                    ) : null}
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm md:col-span-2">
+                    <span className="font-medium text-slate-700">Text</span>
+                    <TLInput
+                      value={turn.text}
+                      onChange={(e) => updateTurn(di, ti, { ...turn, text: e.target.value })}
+                      className="w-full"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm md:col-span-3">
+                    <span className="font-medium text-slate-700">Audio asset</span>
+                    <AssetSelect
+                      value={turn.audioAssetId}
+                      assetType="audio"
+                      options={audios}
+                      onChange={(id) => updateTurn(di, ti, { ...turn, audioAssetId: id })}
+                    />
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeTurn(di, ti)}
+                  className="shrink-0 text-sm text-red-600 hover:underline md:pt-2"
+                >
+                  Remove turn
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => addTurn(di)}
+              className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Add turn
+            </button>
+          </div>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addDialogue}
+        className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+      >
+        Add dialogue
+      </button>
+    </div>
+  );
+}
+
 function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
   const { phase, index } = findPhase(task, "phase1");
   if (!phase) return <p className="text-sm text-slate-500">Phase "phase1" not found.</p>;
@@ -1216,7 +1468,7 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
     const idx = steps.findIndex((s) => s.type === "phase4_subtasks");
     steps[idx] = withIds;
     phases[index] = { ...phase, steps };
-    setTask({ ...task, phases });
+    setTask(syncDialogueSubtaskIdsFromPhase4({ ...task, phases }));
   };
 
   useEffect(() => {
@@ -1230,7 +1482,7 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
     if (idx === -1) return;
     steps[idx] = { ...step, subtasks: ensured };
     phases[index] = { ...phase, steps };
-    setTask({ ...task, phases });
+    setTask(syncDialogueSubtaskIdsFromPhase4({ ...task, phases }));
   }, [task, phase, index, step]);
 
   const subtasks = step.subtasks ?? [];
@@ -1281,7 +1533,6 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   {dialogues.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.id}
-                      {d.subtaskId ? ` · ${d.subtaskId}` : ""}
                       {d.turns?.length != null ? ` (${d.turns.length} turns)` : ""}
                     </option>
                   ))}
@@ -1292,7 +1543,7 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   ) : null}
                 </select>
                 {dialogues.length === 0 ? (
-                  <span className="text-xs text-amber-700">No dialogues in task model yet. Add them under Task model.</span>
+                  <span className="text-xs text-amber-700">No dialogues yet. Add them in the Dialogues tab.</span>
                 ) : null}
               </label>
               <label className="flex flex-col gap-1 text-sm">
@@ -1326,7 +1577,7 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
               if (!dlg) {
                 return (
                   <p className="text-sm text-amber-700">
-                    No dialogue in task model with id &quot;{st.dialogueId}&quot;. Add it under Task model → dialogues,
+                    No dialogue with id &quot;{st.dialogueId}&quot;. Add or fix it in the Dialogues tab,
                     or fix the ID.
                   </p>
                 );
@@ -1881,7 +2132,7 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   ) : null}
                 </select>
                 {dialogues.length === 0 ? (
-                  <span className="text-xs text-amber-700">No dialogues in task model yet.</span>
+                  <span className="text-xs text-amber-700">No dialogues yet. Add them in the Dialogues tab.</span>
                 ) : null}
               </label>
               <label className="flex flex-col gap-1 text-sm">
@@ -1892,10 +2143,10 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   disabled
                   value={rp.difficulty}
                   placeholder="—"
-                  title="Taken from the selected dialogue in the task model"
+                  title="Taken from the selected dialogue (Dialogues tab)"
                   className="cursor-not-allowed rounded border border-slate-200 bg-slate-50 px-2 py-1 text-sm text-slate-600"
                 />
-                <span className="text-xs text-slate-500">From dialogue; edit under Task model dialogues.</span>
+                <span className="text-xs text-slate-500">From dialogue; edit in the Dialogues tab.</span>
               </label>
               <label className="flex flex-col gap-1 text-sm">
                 <span className="font-medium text-slate-700">Allowed roles (comma-separated)</span>
@@ -1930,7 +2181,7 @@ function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                 if (!dlg) {
                   return (
                     <p className="text-sm text-amber-700">
-                      No dialogue in task model with id &quot;{rp.dialogueId}&quot;. Fix the dialogue selection first.
+                      No dialogue with id &quot;{rp.dialogueId}&quot;. Add or fix it in the Dialogues tab first.
                     </p>
                   );
                 }
@@ -2241,6 +2492,8 @@ export default function TaskEditPage() {
         return <AssetsEditor task={task} setTask={setTask} />;
       case "tlts":
         return <TltsEditor task={task} setTask={setTask} />;
+      case "dialogues":
+        return <DialoguesEditor task={task} setTask={setTask} />;
       case "phase1":
         return <Phase1Editor task={task} setTask={setTask} />;
       case "phase2":
@@ -2354,6 +2607,7 @@ export default function TaskEditPage() {
                   { key: "info", label: "Info" },
                   { key: "assets", label: "Assets" },
                   { key: "tlts", label: "TLTS" },
+                  { key: "dialogues", label: "Dialogues" },
                   { key: "phase1", label: "Phase 1 – Entry" },
                   { key: "phase2", label: "Phase 2 – Warmup" },
                   { key: "phase3", label: "Phase 3 – Language items" },
