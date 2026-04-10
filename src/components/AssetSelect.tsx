@@ -9,6 +9,8 @@ import { AudioRecordModal } from "@/components/AudioRecordModal";
 /** Mark portaled new-asset UI so AssetSelect’s document listener ignores pointer events there. */
 const ASSET_SELECT_NEW_MODAL_ATTR = "data-asset-select-new-modal";
 
+const NEW_ASSET_PROMPT_REQUIRED_MSG = "Enter a description (prompt) for this asset.";
+
 export interface AssetSelectItem {
   id: string;
   prompt: string;
@@ -152,9 +154,17 @@ function NewAssetModal({
 
   const handleCreate = () => {
     if (!url.trim()) return;
-    onComplete({ id: assetId, prompt: prompt.trim(), url: url.trim() });
+    const p = prompt.trim();
+    if (!p) {
+      setError(NEW_ASSET_PROMPT_REQUIRED_MSG);
+      return;
+    }
+    setError(null);
+    onComplete({ id: assetId, prompt: p, url: url.trim() });
     onClose();
   };
+
+  const canCreate = Boolean(url.trim() && prompt.trim() && !uploading);
 
   if (!open || typeof document === "undefined") return null;
 
@@ -181,12 +191,25 @@ function NewAssetModal({
           <p className="mt-1 font-mono text-xs text-slate-500">{assetId}</p>
 
           <label className="mt-4 flex flex-col gap-1 text-sm">
-            <span className="font-medium text-slate-700">Prompt (optional)</span>
+            <span className="font-medium text-slate-700">
+              Prompt / description{" "}
+              <span className="font-normal text-red-600" title="Required when creating a new asset">
+                (required)
+              </span>
+            </span>
+            <span className="text-xs font-normal text-slate-500">
+              Shown in dropdowns and editors; optional in raw JSON, but required here when adding.
+            </span>
             <textarea
               value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
+              onChange={(e) => {
+                setPrompt(e.target.value);
+                setError((prev) => (prev === NEW_ASSET_PROMPT_REQUIRED_MSG ? null : prev));
+              }}
               rows={2}
-              placeholder="Describe the asset…"
+              required
+              aria-required
+              placeholder="Short description of this asset…"
               className="rounded border border-slate-300 px-2 py-1 text-sm"
             />
           </label>
@@ -227,7 +250,11 @@ function NewAssetModal({
           ) : null}
 
           {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
-          {!url ? <p className="mt-2 text-xs text-slate-500">Upload or record to attach media before creating.</p> : null}
+          {!url ? (
+            <p className="mt-2 text-xs text-slate-500">Upload or record to attach media before creating.</p>
+          ) : !prompt.trim() ? (
+            <p className="mt-2 text-xs text-amber-800">Add a description (prompt) above, then create.</p>
+          ) : null}
 
           <div className="mt-6 flex justify-end gap-2">
             <button
@@ -240,7 +267,7 @@ function NewAssetModal({
             </button>
             <button
               type="button"
-              disabled={!url.trim() || uploading}
+              disabled={!canCreate}
               onClick={handleCreate}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
