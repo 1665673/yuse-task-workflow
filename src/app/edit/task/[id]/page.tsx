@@ -35,7 +35,8 @@ import { AssetSelect, type AssetSelectItem } from "@/components/AssetSelect";
 import { genAssetId, isDataUrl } from "@/lib/asset-utils";
 import {
   editorAddPrimaryButton,
-  editorAddPrimaryButtonSm,
+  editorAddSecondaryButton,
+  editorAddSecondaryButtonSm,
   editorLabelL1,
   editorLabelL2,
   editorLabelL2Inline,
@@ -171,6 +172,11 @@ interface QuestionListEditorProps {
   audioAssets: AssetSelectItem[];
   onCreateImageAsset: (asset: AssetSelectItem) => void;
   onCreateAudioAsset: (asset: AssetSelectItem) => void;
+  /**
+   * Use "primary" only for a tab-level block (e.g. phase2 warmup). Nested editors (phase3/5 groups) use "secondary"
+   * so the main “Add question” matches other nested controls.
+   */
+  addQuestionButtonLevel?: "primary" | "secondary";
 }
 
 function QuestionListEditor({
@@ -180,7 +186,10 @@ function QuestionListEditor({
   audioAssets,
   onCreateImageAsset,
   onCreateAudioAsset,
+  addQuestionButtonLevel = "secondary",
 }: QuestionListEditorProps) {
+  const addQuestionBtnClass =
+    addQuestionButtonLevel === "primary" ? editorAddPrimaryButton : editorAddSecondaryButton;
   const { isTargetMode } = useContext(TargetLangContext);
   const updateQuestion = (idx: number, next: Question) => {
     const copy = [...questions];
@@ -344,7 +353,7 @@ function QuestionListEditor({
                   const newOpt = q.type === "text_image" ? {} : { text: "" };
                   updateQuestion(idx, { ...q, options: [...q.options, newOpt] });
                 }}
-                className={editorAddPrimaryButtonSm}
+                className={editorAddSecondaryButtonSm}
               >
                 Add option
               </button>
@@ -367,7 +376,7 @@ function QuestionListEditor({
         <button
           type="button"
           onClick={addQuestion}
-          className={editorAddPrimaryButton}
+          className={addQuestionBtnClass}
         >
           Add question
         </button>
@@ -1055,7 +1064,7 @@ function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: Ta
             <button
               type="button"
               onClick={() => addTurn(di)}
-              className={editorAddPrimaryButton}
+              className={editorAddSecondaryButton}
             >
               Add turn
             </button>
@@ -1168,6 +1177,7 @@ function Phase2Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
           audioAssets={taskAudioAssets(task)}
           onCreateImageAsset={(a) => setTask(appendTaskAsset(task, "image", a))}
           onCreateAudioAsset={(a) => setTask(appendTaskAsset(task, "audio", a))}
+          addQuestionButtonLevel="primary"
         />
       </div>
     </div>
@@ -1716,7 +1726,7 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                                     subtasksNext[i] = { ...st, dialogDistractors: dsNext };
                                     updateStep({ ...step, subtasks: subtasksNext });
                                   }}
-                                  className={editorAddPrimaryButtonSm}
+                                  className={editorAddSecondaryButtonSm}
                                 >
                                   Add option
                                 </button>
@@ -2015,7 +2025,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                         },
                       }));
                     }}
-                    className={editorAddPrimaryButtonSm}
+                    className={editorAddSecondaryButtonSm}
                   >
                     Add sentence
                   </button>

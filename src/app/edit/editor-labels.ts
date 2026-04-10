@@ -18,10 +18,17 @@ export const editorLabelL3 =
 /** Inline emphasis for nested labels (Item ID, hint rows) without full-width rule */
 export const editorLabelL2Inline = "text-sm font-semibold text-teal-800";
 
-/** Primary CTA for main “Add …” actions (question, dialogue, item, asset row, subtask, roleplay, …) */
+/** Primary CTA — deep accent for tab-level “Add …” only (assets, TLTS, dialogues, phase2 warmup question, phase3/4/5/6 top-level adds). */
 export const editorAddPrimaryButton =
   "inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-600/30 transition hover:bg-indigo-500 hover:shadow-lg hover:shadow-indigo-600/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 active:bg-indigo-700";
 
-/** Compact primary for nested adds (option, distractor turn, sentence line, …) */
+/** Compact primary (same deep tone) — reserved for rare cases that should match top-level emphasis */
 export const editorAddPrimaryButtonSm =
   "inline-flex items-center justify-center gap-1.5 rounded-md bg-indigo-600 px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm shadow-indigo-600/25 transition hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 active:bg-indigo-700";
+
+/** Light green (Tailwind `green`) for nested adds — softer than primary indigo */
+export const editorAddSecondaryButton =
+  "inline-flex items-center justify-center gap-2 rounded-lg border border-green-400/80 bg-green-100 px-5 py-2.5 text-sm font-semibold text-green-950 shadow-sm shadow-green-900/10 transition hover:bg-green-200 hover:border-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 active:bg-green-300";
+
+export const editorAddSecondaryButtonSm =
+  "inline-flex items-center justify-center gap-1.5 rounded-md border border-green-400/80 bg-green-100 px-3.5 py-1.5 text-sm font-semibold text-green-950 shadow-sm shadow-green-900/10 transition hover:bg-green-200 hover:border-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 active:bg-green-300";
