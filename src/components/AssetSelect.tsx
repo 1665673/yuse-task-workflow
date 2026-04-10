@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { authMultipartHeaders } from "@/lib/api";
 import { genAssetId, isDataUrl } from "@/lib/asset-utils";
@@ -238,6 +238,11 @@ function NewAssetModal({
       if (!res.ok) throw new Error(data.error ?? `Upload failed (${res.status})`);
       if (!data.url) throw new Error("No URL returned");
       setUrl(data.url);
+      setPrompt((prev) => {
+        if (prev.trim()) return prev;
+        const name = file.name.trim();
+        return name || "upload";
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -406,6 +411,13 @@ export function AssetSelect({
   const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !value || !listRef.current) return;
+    const row = listRef.current.querySelector<HTMLElement>(`[data-asset-option-id="${CSS.escape(value)}"]`);
+    row?.scrollIntoView({ block: "nearest", behavior: "auto" });
+  }, [open, value, options]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -468,7 +480,10 @@ export function AssetSelect({
         </button>
 
         {open && !disabled && (
-          <div className="absolute z-50 mt-1 max-h-52 w-full overflow-auto rounded border border-slate-200 bg-white shadow-lg">
+          <div
+            ref={listRef}
+            className="absolute z-50 mt-1 max-h-52 w-full overflow-auto rounded border border-slate-200 bg-white shadow-lg"
+          >
             <button
               type="button"
               onClick={() => {
@@ -482,6 +497,7 @@ export function AssetSelect({
             {options.map((opt) => (
               <div
                 key={opt.id}
+                data-asset-option-id={opt.id}
                 className="flex w-full min-w-0 items-center gap-1 px-1 py-0.5 hover:bg-blue-50"
               >
                 <button

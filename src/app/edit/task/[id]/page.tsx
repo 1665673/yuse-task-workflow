@@ -1,6 +1,15 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import type {
   Question,
@@ -20,6 +29,19 @@ import type {
   Phase5SentencesStep,
   Phase6RoleplayStep,
 } from "@/lib/types";
+
+/** Matches `useState` setter so we can use functional updates and avoid clobbering when chaining with `appendTaskAsset`. */
+type SetTask = Dispatch<SetStateAction<TaskPackage | null>>;
+
+function safeAppendTaskAsset(
+  prev: TaskPackage | null,
+  kind: "image" | "audio",
+  asset: AssetSelectItem
+): TaskPackage | null {
+  if (!prev) return prev;
+  return appendTaskAsset(prev, kind, asset);
+}
+
 import {
   appendTaskAsset,
   ensurePhase4SubtaskIds,
@@ -499,6 +521,10 @@ interface AssetSectionProps {
 
 function AssetSection({ label, assetType, items, onChange }: AssetSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  /** Row index for the next `change` event (set when opening the picker; cleared on change or cancel). */
+  const pendingUploadRowRef = useRef<number | null>(null);
+  /** Clears pending row if the file dialog was cancelled (`change` never runs). */
+  const cancelPickTimerRef = useRef<number | null>(null);
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
   const [recordModalIdx, setRecordModalIdx] = useState<number | null>(null);
 
@@ -519,13 +545,41 @@ function AssetSection({ label, assetType, items, onChange }: AssetSectionProps) 
   };
 
   const handleUploadClick = (idx: number) => {
-    setUploadingIdx(idx);
-    fileInputRef.current?.click();
+    const t = cancelPickTimerRef.current;
+    if (t != null) {
+      window.clearTimeout(t);
+      cancelPickTimerRef.current = null;
+    }
+    pendingUploadRowRef.current = idx;
+    const input = fileInputRef.current;
+    if (!input) return;
+
+    const onWindowFocus = () => {
+      window.removeEventListener("focus", onWindowFocus);
+      const timerId = window.setTimeout(() => {
+        cancelPickTimerRef.current = null;
+        if (pendingUploadRowRef.current === idx) {
+          pendingUploadRowRef.current = null;
+        }
+      }, 300);
+      cancelPickTimerRef.current = timerId as unknown as number;
+    };
+    window.addEventListener("focus", onWindowFocus, { once: true });
+    input.click();
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (cancelPickTimerRef.current != null) {
+      clearTimeout(cancelPickTimerRef.current);
+      cancelPickTimerRef.current = null;
+    }
+    const row = pendingUploadRowRef.current;
+    pendingUploadRowRef.current = null;
     const file = e.target.files?.[0];
-    if (!file || uploadingIdx === null) return;
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (!file || row === null) return;
+
+    setUploadingIdx(row);
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -535,12 +589,11 @@ function AssetSection({ label, assetType, items, onChange }: AssetSectionProps) 
         body: fd,
       });
       const data = (await res.json()) as { url?: string; error?: string };
-      if (data.url) updateItem(uploadingIdx, { url: data.url });
+      if (data.url) updateItem(row, { url: data.url });
     } catch (err) {
       console.error("Upload failed", err);
     } finally {
       setUploadingIdx(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -655,7 +708,7 @@ function AssetSection({ label, assetType, items, onChange }: AssetSectionProps) 
   );
 }
 
-function AssetsEditor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
+function AssetsEditor({ task, setTask }: { task: TaskPackage; setTask: SetTask }) {
   const { isTargetMode } = useContext(TargetLangContext);
   const { assets } = task.taskModel;
 
@@ -878,7 +931,7 @@ function TltSection({ label, items, prefix, onChange }: TltSectionProps) {
   );
 }
 
-function TltsEditor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
+function TltsEditor({ task, setTask }: { task: TaskPackage; setTask: SetTask }) {
   const { tlts } = task.taskModel;
 
   const wordsArr: TltItem[] = Object.entries(tlts.words).map(([id, text]) => ({ id, text }));
@@ -1116,7 +1169,7 @@ function AddDialogueByScriptModal({
   );
 }
 
-function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
+function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: SetTask }) {
   const { isTargetMode } = useContext(TargetLangContext);
   const dialogues = task.taskModel.dialogues ?? [];
   const audios = taskAudioAssets(task);
@@ -1126,7 +1179,13 @@ function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: Ta
   const [scriptModalOpen, setScriptModalOpen] = useState(false);
 
   const setDialogues = (next: Dialogue[]) => {
-    setTask({ ...task, taskModel: { ...task.taskModel, dialogues: next } });
+    setTask((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        taskModel: { ...prev.taskModel, dialogues: next },
+      };
+    });
   };
 
   const normalizeDialogueDifficulty = (d: Dialogue): Dialogue =>
@@ -1320,7 +1379,7 @@ function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: Ta
                       onChange={(id) => updateTurn(di, ti, { ...turn, audioAssetId: id })}
                       allowAddAsset={!isTargetMode}
                       disabled={isTargetMode}
-                      onCreateAsset={(a) => setTask(appendTaskAsset(task, "audio", a))}
+                      onCreateAsset={(a) => setTask((prev) => safeAppendTaskAsset(prev, "audio", a))}
                     />
                   </label>
                 </div>
@@ -1382,7 +1441,7 @@ function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: Ta
   );
 }
 
-function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
+function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: SetTask }) {
   const { isTargetMode } = useContext(TargetLangContext);
   const { phase, index } = findPhase(task, "phase1");
   if (!phase) return <p className="text-sm text-slate-500">Phase "phase1" not found.</p>;
@@ -1390,11 +1449,16 @@ function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
   if (!step) return <p className="text-sm text-slate-500">No steps in phase1.</p>;
 
   const updateStep = (next: Phase1EntryStep) => {
-    const phases = [...task.phases];
-    const steps = [...phase.steps];
-    steps[0] = next;
-    phases[index] = { ...phase, steps };
-    setTask({ ...task, phases });
+    setTask((prev) => {
+      if (!prev) return prev;
+      const { phase: ph, index: i } = findPhase(prev, "phase1");
+      if (i < 0 || !ph) return prev;
+      const steps = [...ph.steps];
+      steps[0] = next;
+      const phases = [...prev.phases];
+      phases[i] = { ...ph, steps };
+      return { ...prev, phases };
+    });
   };
 
   return (
@@ -1409,7 +1473,7 @@ function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
             onChange={(id) => updateStep({ ...step, thumbnail: id })}
             allowAddAsset={!isTargetMode}
             disabled={isTargetMode}
-            onCreateAsset={(a) => setTask(appendTaskAsset(task, "image", a))}
+            onCreateAsset={(a) => setTask((prev) => safeAppendTaskAsset(prev, "image", a))}
           />
         </label>
         <label className="flex flex-col gap-1 text-sm md:col-span-2">
@@ -1451,18 +1515,23 @@ function Phase1Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
   );
 }
 
-function Phase2Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
+function Phase2Editor({ task, setTask }: { task: TaskPackage; setTask: SetTask }) {
   const { phase, index } = findPhase(task, "phase2");
   if (!phase) return <p className="text-sm text-slate-500">Phase "phase2" not found.</p>;
   const step = phase.steps[0] as Phase2WarmupStep | undefined;
   if (!step) return <p className="text-sm text-slate-500">No steps in phase2.</p>;
 
   const updateStep = (next: Phase2WarmupStep) => {
-    const phases = [...task.phases];
-    const steps = [...phase.steps];
-    steps[0] = next;
-    phases[index] = { ...phase, steps };
-    setTask({ ...task, phases });
+    setTask((prev) => {
+      if (!prev) return prev;
+      const { phase: ph, index: i } = findPhase(prev, "phase2");
+      if (i < 0 || !ph) return prev;
+      const steps = [...ph.steps];
+      steps[0] = next;
+      const phases = [...prev.phases];
+      phases[i] = { ...ph, steps };
+      return { ...prev, phases };
+    });
   };
 
   return (
@@ -1474,8 +1543,8 @@ function Phase2Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
           onChange={(next) => updateStep({ ...step, warmupQuestions: next })}
           imageAssets={taskImageAssets(task)}
           audioAssets={taskAudioAssets(task)}
-          onCreateImageAsset={(a) => setTask(appendTaskAsset(task, "image", a))}
-          onCreateAudioAsset={(a) => setTask(appendTaskAsset(task, "audio", a))}
+          onCreateImageAsset={(a) => setTask((prev) => safeAppendTaskAsset(prev, "image", a))}
+          onCreateAudioAsset={(a) => setTask((prev) => safeAppendTaskAsset(prev, "audio", a))}
           addQuestionButtonLevel="primary"
           defaultQuestionType="text_text"
         />
@@ -1502,7 +1571,7 @@ function Phase3Editor({
   wordTltsWords,
 }: {
   task: TaskPackage;
-  setTask: (t: TaskPackage) => void;
+  setTask: SetTask;
   /** When embedding Phase 3 UI (e.g. phase 5), attach new assets to the real task */
   onCreateImageAsset?: (a: AssetSelectItem) => void;
   onCreateAudioAsset?: (a: AssetSelectItem) => void;
@@ -1514,22 +1583,36 @@ function Phase3Editor({
   const { phase, index } = findPhase(task, "phase3");
   if (!phase) return <p className="text-sm text-slate-500">Phase "phase3" not found.</p>;
 
-  const onCreateImageAsset = onCreateImageProp ?? ((a: AssetSelectItem) => setTask(appendTaskAsset(task, "image", a)));
-  const onCreateAudioAsset = onCreateAudioProp ?? ((a: AssetSelectItem) => setTask(appendTaskAsset(task, "audio", a)));
+  const onCreateImageAsset =
+    onCreateImageProp ?? ((a: AssetSelectItem) => setTask((prev) => safeAppendTaskAsset(prev, "image", a)));
+  const onCreateAudioAsset =
+    onCreateAudioProp ?? ((a: AssetSelectItem) => setTask((prev) => safeAppendTaskAsset(prev, "audio", a)));
 
   const updatePhase = (nextPhase: Phase) => {
-    const phases = [...task.phases];
-    phases[index] = nextPhase;
-    setTask({ ...task, phases });
+    setTask((prev) => {
+      if (!prev) return prev;
+      const { phase: ph, index: i } = findPhase(prev, "phase3");
+      if (i < 0 || !ph) return prev;
+      const phases = [...prev.phases];
+      phases[i] = nextPhase;
+      return { ...prev, phases };
+    });
   };
 
   const updateStepAt = <T extends Phase3WordsStep | Phase3PhrasesStep | Phase3SentencesStep>(
     stepIndex: number,
     nextStep: T
   ) => {
-    const steps = [...phase.steps];
-    steps[stepIndex] = nextStep;
-    updatePhase({ ...phase, steps });
+    setTask((prev) => {
+      if (!prev) return prev;
+      const { phase: ph, index: i } = findPhase(prev, "phase3");
+      if (i < 0 || !ph) return prev;
+      const steps = [...ph.steps];
+      steps[stepIndex] = nextStep;
+      const phases = [...prev.phases];
+      phases[i] = { ...ph, steps };
+      return { ...prev, phases };
+    });
   };
 
   const wordsStep = phase.steps.find((s) => s.type === "phase3_words") as Phase3WordsStep | undefined;
@@ -1782,7 +1865,7 @@ function Phase4AddTurnIcon({ className }: { className?: string }) {
   );
 }
 
-function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
+function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: SetTask }) {
   const { phase, index } = findPhase(task, "subtask_learning");
   if (!phase) return <p className="text-sm text-slate-500">Phase \"subtask_learning\" not found.</p>;
   const step = phase.steps.find((s) => s.type === "phase4_subtasks") as Phase4SubtasksStep | undefined;
@@ -2074,27 +2157,28 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
   );
 }
 
-function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
+function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: SetTask }) {
   const { isTargetMode } = useContext(TargetLangContext);
   const { phase, index } = findPhase(task, "reinforcement");
   if (!phase) return <p className="text-sm text-slate-500">Phase "reinforcement" not found.</p>;
-
-  const updatePhase = (nextPhase: Phase) => {
-    const phases = [...task.phases];
-    phases[index] = nextPhase;
-    setTask({ ...task, phases });
-  };
 
   const findStep = <T,>(type: string) =>
     phase.steps.find((s) => s.type === type) as T | undefined;
 
   const updateStep = <T extends { type: string }>(type: string, updater: (current: T) => T) => {
-    const steps = [...phase.steps];
-    const idx = steps.findIndex((s) => s.type === type);
-    if (idx === -1) return;
-    const current = steps[idx] as unknown as T;
-    steps[idx] = updater(current) as unknown as Step;
-    updatePhase({ ...phase, steps });
+    setTask((prev) => {
+      if (!prev) return prev;
+      const { phase: ph, index: i } = findPhase(prev, "reinforcement");
+      if (i < 0 || !ph) return prev;
+      const steps = [...ph.steps];
+      const idx = steps.findIndex((s) => s.type === type);
+      if (idx === -1) return prev;
+      const current = steps[idx] as unknown as T;
+      steps[idx] = updater(current) as unknown as Step;
+      const phases = [...prev.phases];
+      phases[i] = { ...ph, steps };
+      return { ...prev, phases };
+    });
   };
 
   const wordsStep = findStep<Phase5WordsStep>("phase5_words");
@@ -2127,16 +2211,18 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                 } as Phase,
               ],
             }}
-            setTask={(nextTask) => {
-              const phase3 = nextTask.phases[0];
-              const ws = (phase3.steps.find((s) => s.type === "phase3_words") as Phase3WordsStep) ?? wordsStep;
-              updateStep<Phase5WordsStep>("phase5_words", () => ({
-                ...wordsStep,
-                wordQuestions: ws.wordQuestions,
-              }));
-            }}
-            onCreateImageAsset={(a) => setTask(appendTaskAsset(task, "image", a))}
-            onCreateAudioAsset={(a) => setTask(appendTaskAsset(task, "audio", a))}
+            setTask={
+              ((nextTask: TaskPackage) => {
+                const phase3 = nextTask.phases[0];
+                const ws = (phase3.steps.find((s) => s.type === "phase3_words") as Phase3WordsStep) ?? wordsStep;
+                updateStep<Phase5WordsStep>("phase5_words", () => ({
+                  ...wordsStep,
+                  wordQuestions: ws.wordQuestions,
+                }));
+              }) as SetTask
+            }
+            onCreateImageAsset={(a) => setTask((prev) => safeAppendTaskAsset(prev, "image", a))}
+            onCreateAudioAsset={(a) => setTask((prev) => safeAppendTaskAsset(prev, "audio", a))}
           />
         </div>
       )}
@@ -2242,7 +2328,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                       }}
                       allowAddAsset={!isTargetMode}
                       disabled={isTargetMode}
-                      onCreateAsset={(a) => setTask(appendTaskAsset(task, "audio", a))}
+                      onCreateAsset={(a) => setTask((prev) => safeAppendTaskAsset(prev, "audio", a))}
                     />
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
@@ -2275,8 +2361,8 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                     }
                     imageAssets={taskImageAssets(task)}
                     audioAssets={taskAudioAssets(task)}
-                    onCreateImageAsset={(a) => setTask(appendTaskAsset(task, "image", a))}
-                    onCreateAudioAsset={(a) => setTask(appendTaskAsset(task, "audio", a))}
+                    onCreateImageAsset={(a) => setTask((prev) => safeAppendTaskAsset(prev, "image", a))}
+                    onCreateAudioAsset={(a) => setTask((prev) => safeAppendTaskAsset(prev, "audio", a))}
                     defaultQuestionType="audio_text"
                   />
                 </div>
@@ -2523,7 +2609,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                           }
                           allowAddAsset={!isTargetMode}
                           disabled={isTargetMode}
-                          onCreateAsset={(a) => setTask(appendTaskAsset(task, "audio", a))}
+                          onCreateAsset={(a) => setTask((prev) => safeAppendTaskAsset(prev, "audio", a))}
                         />
                       </label>
                     </div>
@@ -2563,7 +2649,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
   );
 }
 
-function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
+function Phase6Editor({ task, setTask }: { task: TaskPackage; setTask: SetTask }) {
   const { isTargetMode } = useContext(TargetLangContext);
   const { phase, index } = findPhase(task, "roleplay");
   if (!phase) return <p className="text-sm text-slate-500">Phase \"roleplay\" not found.</p>;
