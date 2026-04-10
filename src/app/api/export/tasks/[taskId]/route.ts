@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
+import { getBackendBaseUrl } from "@/lib/backend-url";
 import { toClientTaskExportV1 } from "@/lib/taskExport/toClientV1";
-
-function backendBase(): string {
-  return process.env.BACKEND_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:4000";
-}
 
 /**
  * GET /api/export/tasks/:taskId — client v1 task JSON (adaptation runs in Next.js).
@@ -18,7 +15,7 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const res = await fetch(`${backendBase()}/api/tasks/${encodeURIComponent(taskId)}/storage`, {
+  const res = await fetch(`${getBackendBaseUrl()}/api/tasks/${encodeURIComponent(taskId)}/storage`, {
     cache: "no-store",
   });
 

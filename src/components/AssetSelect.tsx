@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { authMultipartHeaders } from "@/lib/api";
-import { genAssetId, isDataUrl } from "@/lib/asset-utils";
+import { genAssetId, isDataUrl, publicAssetUrl } from "@/lib/asset-utils";
 import { AudioRecordModal } from "@/components/AudioRecordModal";
 
 /** Mark portaled new-asset UI so AssetSelect’s document listener ignores pointer events there. */
@@ -75,9 +75,10 @@ function buildAssetDownloadFilename(id: string, prompt: string, url: string, kin
 }
 
 async function triggerAssetDownload(opt: AssetSelectItem, kind: "image" | "audio"): Promise<void> {
-  const url = opt.url?.trim();
-  if (!url) return;
-  const filename = buildAssetDownloadFilename(opt.id, opt.prompt, url, kind);
+  const raw = opt.url?.trim();
+  if (!raw) return;
+  const url = publicAssetUrl(raw);
+  const filename = buildAssetDownloadFilename(opt.id, opt.prompt, raw, kind);
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -134,6 +135,7 @@ export interface AssetSelectProps {
 function AudioInlinePlay({ url }: { url: string }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
+  const src = url ? publicAssetUrl(url) : undefined;
 
   useEffect(() => () => {
     audioRef.current?.pause();
@@ -163,7 +165,7 @@ function AudioInlinePlay({ url }: { url: string }) {
   return (
     <>
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-      <audio ref={audioRef} src={url || undefined} onEnded={() => setPlaying(false)} />
+      <audio ref={audioRef} src={src} onEnded={() => setPlaying(false)} />
       <span
         role="button"
         tabIndex={url ? 0 : -1}
@@ -345,13 +347,13 @@ function NewAssetModal({
 
           {assetKind === "image" && url ? (
             <div className="mt-4 flex justify-center">
-              <img src={url} alt="" className="max-h-40 rounded border border-slate-200 object-contain" />
+              <img src={publicAssetUrl(url)} alt="" className="max-h-40 rounded border border-slate-200 object-contain" />
             </div>
           ) : null}
           {assetKind === "audio" && url ? (
             <div className="mt-4 rounded border border-slate-200 bg-slate-50 p-3">
               {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-              <audio controls src={url} className="w-full" />
+              <audio controls src={publicAssetUrl(url)} className="w-full" />
             </div>
           ) : null}
 
@@ -461,7 +463,11 @@ export function AssetSelect({
           {selected ? (
             <>
               {type === "image" && (
-                <img src={selected.url || undefined} alt="" className="h-5 w-5 shrink-0 rounded bg-slate-100 object-cover" />
+                <img
+                  src={selected.url ? publicAssetUrl(selected.url) : undefined}
+                  alt=""
+                  className="h-5 w-5 shrink-0 rounded bg-slate-100 object-cover"
+                />
               )}
               {type === "audio" && <MicIcon />}
               <span className="flex-1 truncate text-slate-700">{selected.prompt || selected.id}</span>
@@ -509,7 +515,11 @@ export function AssetSelect({
                   className="flex min-w-0 flex-1 items-center gap-2 px-1 py-1 text-left text-sm"
                 >
                   {type === "image" && (
-                    <img src={opt.url || undefined} alt="" className="h-7 w-7 shrink-0 rounded bg-slate-100 object-cover" />
+                    <img
+                      src={opt.url ? publicAssetUrl(opt.url) : undefined}
+                      alt=""
+                      className="h-7 w-7 shrink-0 rounded bg-slate-100 object-cover"
+                    />
                   )}
                   {type === "audio" && <AudioInlinePlay url={opt.url} />}
                   <span className="min-w-0 flex-1 truncate text-slate-700">{opt.prompt || opt.id}</span>

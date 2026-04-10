@@ -1,6 +1,7 @@
 "use client";
 
 import type { TaskModel } from "@/lib/types";
+import { publicAssetUrl } from "@/lib/asset-utils";
 
 interface AssetPlaceholderProps {
   taskModel: TaskModel;
@@ -26,9 +27,10 @@ export function ImagePlaceholder({
     );
   }
 
+  const src = asset.url ? publicAssetUrl(asset.url) : asset.base64;
   return (
     <img
-      src={asset.url ?? asset.base64}
+      src={src}
       alt={asset.prompt ?? "Question image"}
       className="max-h-48 w-auto rounded-lg object-contain"
     />
@@ -50,7 +52,7 @@ export function AudioPlaceholder({
       alert("audio does not exists");
       return;
     }
-    const audio = new Audio(asset.url ?? asset.base64);
+    const audio = new Audio(asset.url ? publicAssetUrl(asset.url) : asset.base64);
     audio.play().catch(console.error);
   };
 

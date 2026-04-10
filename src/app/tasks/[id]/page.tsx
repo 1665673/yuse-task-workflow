@@ -18,6 +18,7 @@ import { Phase5PhraseClozeView } from "@/components/Phase5PhraseClozeView";
 import { Phase6RoleplayView } from "@/components/Phase6RoleplayView";
 import { SpeakPracticeView } from "@/components/SpeakPracticeView";
 import { logTaskPreviewFetch, logTaskPreviewFlattenError } from "@/lib/task-preview-debug";
+import { publicAssetUrl } from "@/lib/asset-utils";
 
 const TASK_PREVIEW_BUILD_MARK = "[yuse task preview] page ready";
 
@@ -487,9 +488,10 @@ export default function TaskDemoPage() {
                 <div className="flex flex-col gap-5">
                   <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Phase 1 — Entry</p>
                   {(() => {
-                    const imgUrl = entry.step.thumbnail
+                    const rawThumb = entry.step.thumbnail
                       ? task.taskModel.assets.images?.[entry.step.thumbnail]?.url
                       : undefined;
+                    const imgUrl = rawThumb ? publicAssetUrl(rawThumb) : undefined;
                     return imgUrl ? (
                       <div className="aspect-square w-full overflow-hidden rounded-xl">
                         <img
@@ -554,11 +556,12 @@ export default function TaskDemoPage() {
               <Phase5SentenceView
                 key={`flow-${flowIndex}`}
                 item={item}
-                referenceAudioUrl={
-                  item.audioAssetId
+                referenceAudioUrl={(() => {
+                  const u = item.audioAssetId
                     ? task.taskModel.assets?.audios?.[item.audioAssetId]?.url
-                    : undefined
-                }
+                    : undefined;
+                  return u ? publicAssetUrl(u) : undefined;
+                })()}
                 onContinue={handleFlowContinue}
               />
             )}

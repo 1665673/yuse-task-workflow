@@ -54,7 +54,7 @@ import { authJsonHeaders, authMultipartHeaders } from "@/lib/api";
 import { normalizeTaskPackage } from "@/lib/normalize-task-package";
 import { AudioRecordModal } from "@/components/AudioRecordModal";
 import { AssetSelect, type AssetSelectItem } from "@/components/AssetSelect";
-import { genAssetId, isDataUrl } from "@/lib/asset-utils";
+import { genAssetId, isDataUrl, publicAssetUrl } from "@/lib/asset-utils";
 import {
   editorAddPrimaryButton,
   editorAddSecondaryButton,
@@ -442,9 +442,10 @@ function ImagePreview({ url }: { url: string }) {
       </div>
     );
   }
+  const src = publicAssetUrl(url);
   return (
     <img
-      src={url}
+      src={src}
       alt=""
       onError={() => setBroken(true)}
       className="h-full w-full object-cover"
@@ -463,6 +464,8 @@ function AudioPreview({ url }: { url: string }) {
     el.addEventListener("ended", onEnded);
     return () => el.removeEventListener("ended", onEnded);
   }, []);
+
+  const src = url ? publicAssetUrl(url) : "";
 
   useEffect(() => {
     const el = audioRef.current;
@@ -484,7 +487,7 @@ function AudioPreview({ url }: { url: string }) {
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-1">
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-      <audio ref={audioRef} src={url || undefined} />
+      <audio ref={audioRef} src={src || undefined} />
       <button
         type="button"
         onClick={toggle}

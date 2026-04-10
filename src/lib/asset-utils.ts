@@ -10,3 +10,22 @@ export function genAssetId(prefix: string, existing: string[]): string {
 export function isDataUrl(url: string): boolean {
   return url.startsWith("data:");
 }
+
+/**
+ * Stored task assets should use same-origin paths `/uploads/...` (see Next rewrite → API).
+ * Older tasks may contain absolute dev URLs like `http://localhost:4000/uploads/...`; strip to the path.
+ */
+export function publicAssetUrl(url: string): string {
+  const t = url.trim();
+  if (!t || isDataUrl(t) || t.startsWith("blob:")) return t;
+  if (t.startsWith("/")) return t;
+  try {
+    const u = new URL(t);
+    if (u.pathname.startsWith("/uploads/")) {
+      return `${u.pathname}${u.search}`;
+    }
+  } catch {
+    /* ignore */
+  }
+  return t;
+}
