@@ -16,7 +16,6 @@ import { Phase4SubtaskView } from "@/components/Phase4SubtaskView";
 import { Phase5SentenceView } from "@/components/Phase5SentenceView";
 import { Phase5PhraseClozeView } from "@/components/Phase5PhraseClozeView";
 import { Phase6RoleplayView } from "@/components/Phase6RoleplayView";
-import { Phase5PhraseRecognitionView } from "@/components/Phase5PhraseRecognitionView";
 import { SpeakPracticeView } from "@/components/SpeakPracticeView";
 import { logTaskPreviewFetch, logTaskPreviewFlattenError } from "@/lib/task-preview-debug";
 
@@ -560,13 +559,6 @@ export default function TaskDemoPage() {
             )}
             {item.kind === "phase5_phrase_cloze" && (
               <Phase5PhraseClozeView
-                key={`flow-${flowIndex}`}
-                item={item}
-                onContinue={handleFlowContinue}
-              />
-            )}
-            {item.kind === "phase5_phrase_recognition" && (
-              <Phase5PhraseRecognitionView
                 key={`flow-${flowIndex}`}
                 item={item}
                 onContinue={handleFlowContinue}

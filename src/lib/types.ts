@@ -182,6 +182,7 @@ export interface PhraseClozeEntry {
 
 export interface Phase5PhrasesStep extends BaseStep {
   type: "phase5_phrases";
+  /** Optional quiz questions per phrase id (same shape as phase5_words / phase3); learner flow runs these before cloze for that phrase. */
   phraseQuestions?: { [phraseId: string]: Question[] };
   phraseClozes?: { [phraseId: string]: PhraseClozeEntry };
 }

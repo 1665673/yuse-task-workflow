@@ -61,19 +61,6 @@ export interface Phase5PhraseClozeItem {
   sentence: string;
   answer: string;
   textHint?: string;
-  audioHint?: string;
-  step: Phase5PhrasesStep;
-  phase: Phase;
-}
-
-export interface Phase5PhraseRecognitionItem {
-  kind: "phase5_phrase_recognition";
-  phaseIndex: number;
-  stepIndex: number;
-  phraseId: string;
-  phraseText: string;
-  phraseTranslation: string;
-  phraseDistractor: string;
   step: Phase5PhrasesStep;
   phase: Phase;
 }
@@ -102,7 +89,6 @@ export type FlowItem =
   | Phase4SubtaskItem
   | Phase5SentenceItem
   | Phase5PhraseClozeItem
-  | Phase5PhraseRecognitionItem
   | Phase6RoleplayItem
   | Phase5SpeakPracticeItem;
 
@@ -224,24 +210,42 @@ export function flattenTaskFlow(task: TaskPackage): {
       }
       if (step.type === "phase5_phrases") {
         const st = step as Phase5PhrasesStep;
-        const phraseClozes = st.phraseClozes ?? {};
-        Object.entries(phraseClozes).forEach(([phraseId, entry]) => {
-          if (!entry) return;
-          if (entry.phraseDistractor) {
-            const phraseText = tlts?.phrases?.[phraseId] ?? phraseId;
-            const phraseTranslation = task.translations?.[phraseId]?.native ?? "";
-            flowItems.push({
-              kind: "phase5_phrase_recognition",
-              phaseIndex,
-              stepIndex,
-              phraseId,
-              phraseText,
-              phraseTranslation,
-              phraseDistractor: entry.phraseDistractor,
-              step: st,
-              phase,
+        const pq = st.phraseQuestions ?? {};
+        const pc = st.phraseClozes ?? {};
+        const phraseIdOrder = [
+          ...Object.keys(pc),
+          ...Object.keys(pq).filter((id) => !Object.prototype.hasOwnProperty.call(pc, id)),
+        ];
+
+        for (const phraseId of phraseIdOrder) {
+          const phraseText = tlts?.phrases?.[phraseId] ?? phraseId;
+          const phraseQs = pq[phraseId];
+          if (phraseQs && phraseQs.length > 0) {
+            phraseQs.forEach((question, questionIndex) => {
+              flowItems.push({
+                kind: "question",
+                phaseIndex,
+                stepIndex,
+                questionIndex,
+                question,
+                step,
+                phase,
+              });
+              flowItems.push({
+                kind: "phase5_speak_practice",
+                phaseIndex,
+                stepIndex,
+                textToSpeak: phraseText,
+                sourceType: "phrase",
+                step,
+                phase,
+              });
             });
           }
+
+          const entry = pc[phraseId];
+          if (!entry) continue;
+
           const sentences = entry.sentences ?? [];
           const totalRounds = sentences.length;
           sentences.forEach((sentence, roundIndex) => {
@@ -255,22 +259,7 @@ export function flattenTaskFlow(task: TaskPackage): {
               sentence,
               answer: entry.answer ?? "",
               textHint: entry.textHint,
-              audioHint: entry.audioHint,
               step: st,
-              phase,
-            });
-          });
-        });
-        if (Object.keys(phraseClozes).length === 0) {
-          const questions = getQuestionsFromStep(step);
-          questions.forEach((question, questionIndex) => {
-            flowItems.push({
-              kind: "question",
-              phaseIndex,
-              stepIndex,
-              questionIndex,
-              question,
-              step,
               phase,
             });
           });

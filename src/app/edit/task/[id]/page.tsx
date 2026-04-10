@@ -1795,7 +1795,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
             wordGroupCopy={{
               sectionLabel: "Words",
               itemIdLabel: "Word",
-              addGroupLabel: "Add word",
+              addGroupLabel: "Add Phase5 Word",
               removeGroupLabel: "Remove word",
             }}
             task={{
@@ -1851,10 +1851,14 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                         for (const [k, v] of Object.entries(clozeMap)) {
                           next[k === phraseId ? newKey : k] = v;
                         }
-                        updateStep<Phase5PhrasesStep>("phase5_phrases", (cur) => ({
-                          ...cur,
-                          phraseClozes: next,
-                        }));
+                        updateStep<Phase5PhrasesStep>("phase5_phrases", (cur) => {
+                          const pq0 = cur.phraseQuestions ?? {};
+                          const nextPq: { [k: string]: Question[] } = {};
+                          for (const [k, v] of Object.entries(pq0)) {
+                            nextPq[k === phraseId ? newKey : k] = v;
+                          }
+                          return { ...cur, phraseClozes: next, phraseQuestions: nextPq };
+                        });
                       }}
                       className="max-w-lg rounded border border-slate-300 bg-white px-2 py-1.5 text-sm"
                     >
@@ -1877,10 +1881,11 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                       for (const [k, v] of Object.entries(phrasesStep.phraseClozes ?? {})) {
                         if (k !== phraseId) next[k] = v;
                       }
-                      updateStep<Phase5PhrasesStep>("phase5_phrases", (cur) => ({
-                        ...cur,
-                        phraseClozes: next,
-                      }));
+                      updateStep<Phase5PhrasesStep>("phase5_phrases", (cur) => {
+                        const pq0 = { ...(cur.phraseQuestions ?? {}) };
+                        delete pq0[phraseId];
+                        return { ...cur, phraseClozes: next, phraseQuestions: pq0 };
+                      });
                     }}
                     className="text-sm text-red-600 hover:underline"
                   >
@@ -1942,6 +1947,22 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                       className="rounded border border-slate-300 px-2 py-1 text-sm"
                     />
                   </label>
+                </div>
+                <div className="space-y-3">
+                  <p className={editorLabelL2}>Phrase questions</p>
+                  <QuestionListEditor
+                    questions={phrasesStep.phraseQuestions?.[phraseId] ?? []}
+                    onChange={(nextQs) =>
+                      updateStep<Phase5PhrasesStep>("phase5_phrases", (cur) => ({
+                        ...cur,
+                        phraseQuestions: { ...(cur.phraseQuestions ?? {}), [phraseId]: nextQs },
+                      }))
+                    }
+                    imageAssets={taskImageAssets(task)}
+                    audioAssets={taskAudioAssets(task)}
+                    onCreateImageAsset={(a) => setTask(appendTaskAsset(task, "image", a))}
+                    onCreateAudioAsset={(a) => setTask(appendTaskAsset(task, "audio", a))}
+                  />
                 </div>
                 <div className="space-y-2">
                   <p className={editorLabelL2}>Cloze Sentences (one question per sentence)</p>
@@ -2046,7 +2067,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
               }}
               className={editorAddPrimaryButton}
             >
-              Add phrase cloze
+              Add Phase5 Phrase
             </button>
           </div>
         </div>
@@ -2181,7 +2202,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   }}
                   className={`${editorAddPrimaryButton} disabled:cursor-not-allowed disabled:opacity-50`}
                 >
-                  Add sentence
+                  Add Phase5 Sentence
                 </button>
               </div>
             );
