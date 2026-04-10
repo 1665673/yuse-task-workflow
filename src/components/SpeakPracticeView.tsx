@@ -9,11 +9,27 @@ interface SpeakPracticeViewProps {
   onContinue: () => void;
 }
 
+function pickRecorderMimeType(): string | undefined {
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/mp4",
+    "audio/ogg;codecs=opus",
+  ];
+  for (const t of candidates) {
+    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(t)) {
+      return t;
+    }
+  }
+  return undefined;
+}
+
 export function SpeakPracticeView({ textToSpeak, onContinue }: SpeakPracticeViewProps) {
   const [state, setState] = useState<RecordingState>("idle");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [evaluationResult, setEvaluationResult] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -49,7 +65,10 @@ export function SpeakPracticeView({ textToSpeak, onContinue }: SpeakPracticeView
     if (!stream) return;
 
     audioChunksRef.current = [];
-    const mediaRecorder = new MediaRecorder(stream);
+    const mimeType = pickRecorderMimeType();
+    const mediaRecorder = mimeType
+      ? new MediaRecorder(stream, { mimeType })
+      : new MediaRecorder(stream);
     mediaRecorderRef.current = mediaRecorder;
 
     mediaRecorder.ondataavailable = (event) => {
@@ -59,12 +78,18 @@ export function SpeakPracticeView({ textToSpeak, onContinue }: SpeakPracticeView
     };
 
     mediaRecorder.onstop = () => {
-      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      const blobType = mediaRecorder.mimeType || mimeType || "audio/webm";
+      const audioBlob = new Blob(audioChunksRef.current, { type: blobType });
+      if (audioBlob.size === 0) {
+        setState("idle");
+        return;
+      }
       const url = URL.createObjectURL(audioBlob);
       if (audioUrl) {
         URL.revokeObjectURL(audioUrl);
       }
       setAudioUrl(url);
+      setPlaybackError(null);
       setState("recorded");
     };
 
@@ -88,13 +113,17 @@ export function SpeakPracticeView({ textToSpeak, onContinue }: SpeakPracticeView
     }
     setAudioUrl(null);
     setEvaluationResult(null);
+    setPlaybackError(null);
     setState("idle");
   }, [audioUrl]);
 
   const handlePlayback = useCallback(() => {
-    if (audioRef.current && audioUrl) {
-      audioRef.current.play();
-    }
+    const el = audioRef.current;
+    if (!el || !audioUrl) return;
+    setPlaybackError(null);
+    void el.play().catch(() => {
+      setPlaybackError("无法播放此录音（格式可能不受支持或文件无效）。请重录或换用 Chrome / Edge。");
+    });
   }, [audioUrl]);
 
   const handleSubmitForEvaluation = useCallback(() => {
@@ -158,7 +187,14 @@ export function SpeakPracticeView({ textToSpeak, onContinue }: SpeakPracticeView
             >
               <PlayIcon className="h-12 w-12" />
             </button>
-            {audioUrl && <audio ref={audioRef} src={audioUrl} />}
+            {audioUrl && (
+              <>
+                <audio ref={audioRef} src={audioUrl} preload="auto" />
+                {playbackError && (
+                  <p className="max-w-sm text-center text-sm text-amber-800">{playbackError}</p>
+                )}
+              </>
+            )}
           </div>
         )}
 
