@@ -1177,6 +1177,7 @@ function Phase2Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
 /** Optional copy when Phase3Editor is embedded for Phase 5 words (`wordQuestions` is still keyed by word id). */
 type Phase3WordGroupCopy = {
   sectionLabel: string;
+  /** Label for the TLTS picker (e.g. “Word”) — ids are never shown. */
   itemIdLabel: string;
   addGroupLabel: string;
   removeGroupLabel: string;
@@ -1229,31 +1230,31 @@ function Phase3Editor({
     label: string,
     map: Record<string, Question[]>,
     onChange: (next: Record<string, Question[]>) => void,
-    groupUi?: { idLabel: string; add: string; remove: string },
+    groupUi?: { selectLabel: string; add: string; remove: string },
     tltsLookup?: Record<string, string>
   ) => {
-    const idLabel = groupUi?.idLabel ?? "Item ID";
-    const addLabel = groupUi?.add ?? "Add item";
-    const removeLabel = groupUi?.remove ?? "Remove item";
-    const useTlts = tltsLookup && Object.keys(tltsLookup).length > 0;
+    const selectLabel = groupUi?.selectLabel ?? "Item";
+    const addLabel = groupUi?.add ?? "Add group";
+    const removeLabel = groupUi?.remove ?? "Remove group";
+    const tlts = tltsLookup ?? {};
+    const hasTlts = Object.keys(tlts).length > 0;
     const entries = Object.entries(map);
-    const addKey = () => {
-      if (useTlts && tltsLookup) {
-        const used = new Set(Object.keys(map));
-        const free = firstUnusedTltsKey(tltsLookup, used);
-        if (free) {
-          onChange({ ...map, [free]: [] });
-          return;
-        }
-      }
-      let i = 1;
-      let key: string;
-      do {
-        key = `id_${i}`;
-        i += 1;
-      } while (map[key]);
-      onChange({ ...map, [key]: [] });
+
+    const textForTltsKey = (k: string) => {
+      const t = (tlts[k] ?? "").trim();
+      return t || "—";
     };
+
+    const addKey = () => {
+      if (!hasTlts) return;
+      const used = new Set(Object.keys(map));
+      const free = firstUnusedTltsKey(tlts, used);
+      if (free) onChange({ ...map, [free]: [] });
+    };
+
+    const canAddAnother = () =>
+      hasTlts && firstUnusedTltsKey(tlts, new Set(Object.keys(map))) !== undefined;
+
     const updateKey = (oldKey: string, newKey: string) => {
       if (!newKey || newKey === oldKey || map[newKey]) return;
       const next: Record<string, Question[]> = {};
@@ -1273,49 +1274,86 @@ function Phase3Editor({
       onChange(next);
     };
 
+    const pickerForRow = (key: string) => {
+      const inTlts = Object.prototype.hasOwnProperty.call(tlts, key);
+      if (hasTlts && inTlts) {
+        return (
+          <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+            <span className={editorLabelL2Inline}>{selectLabel}</span>
+            <select
+              value={key}
+              onChange={(e) => updateKey(key, e.target.value)}
+              className="w-full max-w-lg rounded border border-slate-300 bg-white px-2 py-1.5 text-sm"
+            >
+              {Object.keys(tlts)
+                .filter((k) => k === key || !(k in map))
+                .map((k) => (
+                  <option key={k} value={k}>
+                    {textForTltsKey(k)}
+                  </option>
+                ))}
+            </select>
+          </label>
+        );
+      }
+      if (hasTlts && !inTlts) {
+        const freeKeys = Object.keys(tlts).filter((k) => !(k in map));
+        return (
+          <div className="min-w-0 flex-1 space-y-2">
+            <span className={editorLabelL2Inline}>{selectLabel}</span>
+            <p className="text-sm text-amber-800">
+              This group is not linked to the current TLTS list. Choose a {selectLabel.toLowerCase()} below or remove the
+              group.
+            </p>
+            {freeKeys.length === 0 ? (
+              <p className="text-sm text-amber-800">
+                No free TLTS slots. Remove another question group or add entries in the TLTS tab.
+              </p>
+            ) : (
+              <select
+                value=""
+                onChange={(e) => {
+                  const nk = e.target.value;
+                  if (nk) updateKey(key, nk);
+                }}
+                className="w-full max-w-lg rounded border border-slate-300 bg-white px-2 py-1.5 text-sm"
+              >
+                <option value="">Choose from TLTS…</option>
+                {freeKeys.map((k) => (
+                  <option key={k} value={k}>
+                    {textForTltsKey(k)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        );
+      }
+      return (
+        <div className="min-w-0 flex-1 space-y-1">
+          <span className={editorLabelL2Inline}>{selectLabel}</span>
+          <p className="text-sm text-amber-800">
+            Add {selectLabel.toLowerCase()} entries in the TLTS tab first. Internal ids are not shown or edited here.
+          </p>
+        </div>
+      );
+    };
+
     return (
       <div className="space-y-3">
         <p className={editorLabelL1}>{label}</p>
+        {!hasTlts && entries.length === 0 ? (
+          <p className="text-sm text-slate-600">
+            No TLTS {selectLabel.toLowerCase()} entries yet. Add them under the TLTS tab, then add question groups here.
+          </p>
+        ) : null}
         {entries.map(([key, qs]) => (
           <div
             key={key}
             className="space-y-2 rounded-lg border border-teal-200/90 border-l-[3px] border-l-teal-500 bg-gradient-to-br from-teal-50/40 to-slate-50 p-3 shadow-sm"
           >
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-              {useTlts && tltsLookup ? (
-                <div className="min-w-0 flex-1 space-y-2">
-                  <span className={editorLabelL2Inline}>{idLabel}</span>
-                  <p className="text-base font-medium leading-snug text-slate-900">
-                    {(tltsLookup[key] ?? "").trim() || "—"}
-                  </p>
-                  <select
-                    value={key}
-                    onChange={(e) => updateKey(key, e.target.value)}
-                    className="w-full max-w-lg rounded border border-slate-300 bg-white px-2 py-1.5 text-sm"
-                  >
-                    {Object.entries(tltsLookup)
-                      .filter(([k]) => k === key || !(k in map))
-                      .map(([k, text]) => (
-                        <option key={k} value={k}>
-                          {(text ?? "").trim() || k}
-                        </option>
-                      ))}
-                    {!Object.prototype.hasOwnProperty.call(tltsLookup, key) ? (
-                      <option value={key}>Missing in TLTS: {key}</option>
-                    ) : null}
-                  </select>
-                </div>
-              ) : (
-                <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
-                  <span className={editorLabelL2Inline}>{idLabel}</span>
-                  <input
-                    type="text"
-                    value={key}
-                    onChange={(e) => updateKey(key, e.target.value)}
-                    className="rounded border border-slate-300 px-2 py-1 text-sm"
-                  />
-                </label>
-              )}
+              {pickerForRow(key)}
               <button
                 type="button"
                 onClick={() => removeKey(key)}
@@ -1337,7 +1375,9 @@ function Phase3Editor({
         <button
           type="button"
           onClick={addKey}
-          className={editorAddPrimaryButton}
+          disabled={!canAddAnother()}
+          title={!hasTlts ? "Add TLTS entries first" : !canAddAnother() ? "Every TLTS item already has a group" : undefined}
+          className={`${editorAddPrimaryButton} disabled:cursor-not-allowed disabled:opacity-50`}
         >
           {addLabel}
         </button>
@@ -1347,11 +1387,13 @@ function Phase3Editor({
 
   const wordGroupUi = wordGroupCopy
     ? {
-        idLabel: wordGroupCopy.itemIdLabel,
+        selectLabel: wordGroupCopy.itemIdLabel,
         add: wordGroupCopy.addGroupLabel,
         remove: wordGroupCopy.removeGroupLabel,
       }
     : undefined;
+
+  const tltsWords = wordTltsWords ?? task.taskModel.tlts.words ?? {};
 
   return (
     <div className="space-y-6">
@@ -1365,8 +1407,11 @@ function Phase3Editor({
                 phase.steps.findIndex((s) => s.type === "phase3_words"),
                 { ...wordsStep, wordQuestions: next }
               ),
-            wordGroupUi,
-            wordGroupCopy ? wordTltsWords : undefined
+            wordGroupUi ??
+              (!wordGroupCopy
+                ? { selectLabel: "Word", add: "Add word", remove: "Remove word" }
+                : undefined),
+            tltsWords
           )}
         </div>
       )}
@@ -1379,7 +1424,9 @@ function Phase3Editor({
               updateStepAt(
                 phase.steps.findIndex((s) => s.type === "phase3_phrases"),
                 { ...phrasesStep, phraseQuestions: next }
-              )
+              ),
+            { selectLabel: "Phrase", add: "Add phrase", remove: "Remove phrase" },
+            task.taskModel.tlts.phrases ?? {}
           )}
         </div>
       )}
@@ -1392,7 +1439,9 @@ function Phase3Editor({
               updateStepAt(
                 phase.steps.findIndex((s) => s.type === "phase3_sentences"),
                 { ...sentencesStep, sentenceQuestions: next }
-              )
+              ),
+            { selectLabel: "Sentence", add: "Add sentence", remove: "Remove sentence" },
+            task.taskModel.tlts.sentences ?? {}
           )}
         </div>
       )}
@@ -1711,6 +1760,7 @@ function Phase4Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
 }
 
 function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
+  const { isTargetMode } = useContext(TargetLangContext);
   const { phase, index } = findPhase(task, "reinforcement");
   if (!phase) return <p className="text-sm text-slate-500">Phase "reinforcement" not found.</p>;
 
@@ -1782,17 +1832,15 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
           <div className="space-y-3">
             {Object.entries(phrasesStep.phraseClozes ?? {}).map(([phraseId, entry], idx) => {
               const tltsPhrases = task.taskModel.tlts.phrases ?? {};
-              const phraseDisplay = (tltsPhrases[phraseId] ?? "").trim();
               const clozeMap = phrasesStep.phraseClozes ?? {};
               return (
               <div
                 key={phraseId}
                 className="space-y-2 rounded-lg border border-slate-200 border-l-4 border-l-teal-500 bg-white p-4 shadow-sm"
               >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0 flex-1 space-y-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                  <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
                     <span className={editorLabelL2Inline}>Phrase</span>
-                    <p className="text-base font-medium leading-snug text-slate-900">{phraseDisplay || "—"}</p>
                     <select
                       value={phraseId}
                       onChange={(e) => {
@@ -1814,14 +1862,14 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                         .filter(([k]) => k === phraseId || !(k in clozeMap))
                         .map(([k, text]) => (
                           <option key={k} value={k}>
-                            {(text ?? "").trim() || k}
+                            {(text ?? "").trim() || "—"}
                           </option>
                         ))}
                       {!Object.prototype.hasOwnProperty.call(tltsPhrases, phraseId) ? (
-                        <option value={phraseId}>Not in TLTS: {phraseId}</option>
+                        <option value={phraseId}>Not in TLTS — add or fix in TLTS tab</option>
                       ) : null}
                     </select>
-                  </div>
+                  </label>
                   <button
                     type="button"
                     onClick={() => {
@@ -1839,62 +1887,67 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                     Remove phrase
                   </button>
                 </div>
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className={editorLabelL2Inline}>Answer</span>
-                  <input
-                    type="text"
-                    value={entry.answer}
-                    onChange={(e) => {
-                      updateStep<Phase5PhrasesStep>("phase5_phrases", (cur) => ({
-                        ...cur,
-                        phraseClozes: {
-                          ...(cur.phraseClozes ?? {}),
-                          [phraseId]: { ...entry, answer: e.target.value },
-                        },
-                      }));
-                    }}
-                    className="rounded border border-slate-300 px-2 py-1 text-sm"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className={editorLabelL2Inline}>Text hint</span>
-                  <input
-                    type="text"
-                    value={entry.textHint ?? ""}
-                    onChange={(e) => {
-                      updateStep<Phase5PhrasesStep>("phase5_phrases", (cur) => ({
-                        ...cur,
-                        phraseClozes: {
-                          ...(cur.phraseClozes ?? {}),
-                          [phraseId]: { ...entry, textHint: e.target.value || undefined },
-                        },
-                      }));
-                    }}
-                    className="rounded border border-slate-300 px-2 py-1 text-sm"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className={editorLabelL2Inline}>Audio hint asset ID</span>
-                  <input
-                    type="text"
-                    value={entry.audioHint ?? ""}
-                    onChange={(e) => {
-                      updateStep<Phase5PhrasesStep>("phase5_phrases", (cur) => ({
-                        ...cur,
-                        phraseClozes: {
-                          ...(cur.phraseClozes ?? {}),
-                          [phraseId]: { ...entry, audioHint: e.target.value || undefined },
-                        },
-                      }));
-                    }}
-                    className="rounded border border-slate-300 px-2 py-1 text-sm"
-                  />
-                </label>
+                <div className="space-y-2 hidden">
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className={editorLabelL2Inline}>Text hint</span>
+                    <input
+                      type="text"
+                      value={entry.textHint ?? ""}
+                      onChange={(e) => {
+                        updateStep<Phase5PhrasesStep>("phase5_phrases", (cur) => ({
+                          ...cur,
+                          phraseClozes: {
+                            ...(cur.phraseClozes ?? {}),
+                            [phraseId]: { ...entry, textHint: e.target.value || undefined },
+                          },
+                        }));
+                      }}
+                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className={editorLabelL2Inline}>Audio hint</span>
+                    <AssetSelect
+                      type="audio"
+                      value={entry.audioHint}
+                      options={taskAudioAssets(task)}
+                      onChange={(id) => {
+                        updateStep<Phase5PhrasesStep>("phase5_phrases", (cur) => ({
+                          ...cur,
+                          phraseClozes: {
+                            ...(cur.phraseClozes ?? {}),
+                            [phraseId]: { ...entry, audioHint: id || undefined },
+                          },
+                        }));
+                      }}
+                      allowAddAsset={!isTargetMode}
+                      disabled={isTargetMode}
+                      onCreateAsset={(a) => setTask(appendTaskAsset(task, "audio", a))}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className={editorLabelL2Inline}>Phrase distractor</span>
+                    <input
+                      type="text"
+                      value={entry.phraseDistractor ?? ""}
+                      onChange={(e) => {
+                        updateStep<Phase5PhrasesStep>("phase5_phrases", (cur) => ({
+                          ...cur,
+                          phraseClozes: {
+                            ...(cur.phraseClozes ?? {}),
+                            [phraseId]: { ...entry, phraseDistractor: e.target.value || undefined },
+                          },
+                        }));
+                      }}
+                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                    />
+                  </label>
+                </div>
                 <div className="space-y-2">
-                  <p className={editorLabelL2}>Sentences (one per round)</p>
+                  <p className={editorLabelL2}>Cloze Sentences (one question per sentence)</p>
                   {(entry.sentences ?? []).map((s, sIdx) => (
                     <div key={sIdx} className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500 w-14">Round {sIdx + 1}</span>
+                      <span className="text-xs text-slate-500 w-20 shrink-0">Sentence {sIdx + 1}</span>
                       <input
                         type="text"
                         value={s}
@@ -1946,6 +1999,23 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                     Add sentence
                   </button>
                 </div>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className={editorLabelL2Inline}>Answer</span>
+                  <input
+                    type="text"
+                    value={entry.answer}
+                    onChange={(e) => {
+                      updateStep<Phase5PhrasesStep>("phase5_phrases", (cur) => ({
+                        ...cur,
+                        phraseClozes: {
+                          ...(cur.phraseClozes ?? {}),
+                          [phraseId]: { ...entry, answer: e.target.value },
+                        },
+                      }));
+                    }}
+                    className="rounded border border-slate-300 px-2 py-1 text-sm"
+                  />
+                </label>
               </div>
               );
             })}
@@ -1985,59 +2055,137 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
       {sentencesStep && (
         <div className="space-y-3">
           <p className={editorLabelL1}>Sentences</p>
-          <div className="space-y-2">
-            {(sentencesStep.sentences ?? []).map((s, idx) => {
-              const t = s.trim();
-              const preview =
-                t.length === 0 ? `Sentence ${idx + 1}` : t.length > 40 ? `${t.slice(0, 40)}…` : t;
-              return (
-              <div key={idx} className="flex items-center gap-2">
-                <span
-                  className="w-32 shrink-0 truncate text-xs text-slate-500"
-                  title={t || undefined}
-                >
-                  {preview}
-                </span>
-                <input
-                  type="text"
-                  value={s}
-                  onChange={(e) =>
-                    updateStep<Phase5SentencesStep>("phase5_sentences", (cur) => {
-                      const next = [...(cur.sentences ?? [])];
-                      next[idx] = e.target.value;
-                      return { ...cur, sentences: next };
-                    })
-                  }
-                  className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm"
-                />
+          {(() => {
+            const tltsSentences = task.taskModel.tlts.sentences ?? {};
+            const list = sentencesStep.sentences ?? [];
+            const hasTlts = Object.keys(tltsSentences).length > 0;
+            const labelForKey = (k: string) => (tltsSentences[k] ?? "").trim() || "—";
+            const usedElsewhere = (key: string, at: number) =>
+              list.some((v, i) => v === key && i !== at);
+            const optionKeysForRow = (stored: string, idx: number) =>
+              Object.keys(tltsSentences).filter((k) => k === stored || !usedElsewhere(k, idx));
+
+            return (
+              <div className="space-y-2">
+                {!hasTlts && list.length === 0 ? (
+                  <p className="text-sm text-slate-600">
+                    Add sentence entries in the TLTS tab first, then add rows here.
+                  </p>
+                ) : null}
+                {list.map((stored, idx) => {
+                  const inTlts = Object.prototype.hasOwnProperty.call(tltsSentences, stored);
+                  return (
+                    <div
+                      key={`${idx}-${stored}`}
+                      className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3"
+                    >
+                      {hasTlts && inTlts ? (
+                        <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+                          <span className={editorLabelL2Inline}>Sentence</span>
+                          <select
+                            value={stored}
+                            onChange={(e) => {
+                              const nk = e.target.value;
+                              if (!nk || nk === stored) return;
+                              updateStep<Phase5SentencesStep>("phase5_sentences", (cur) => {
+                                const next = [...(cur.sentences ?? [])];
+                                next[idx] = nk;
+                                return { ...cur, sentences: next };
+                              });
+                            }}
+                            className="max-w-lg rounded border border-slate-300 bg-white px-2 py-1.5 text-sm"
+                          >
+                            {optionKeysForRow(stored, idx).map((k) => (
+                              <option key={k} value={k}>
+                                {labelForKey(k)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      ) : hasTlts && !inTlts ? (
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <span className={editorLabelL2Inline}>Sentence</span>
+                          <p className="text-sm text-amber-800">
+                            This row is not linked to TLTS. Choose a sentence below or remove the row.
+                          </p>
+                          {optionKeysForRow(stored, idx).length === 0 ? (
+                            <p className="text-sm text-amber-800">
+                              No free TLTS slots. Remove another row or add entries in the TLTS tab.
+                            </p>
+                          ) : (
+                            <select
+                              value=""
+                              onChange={(e) => {
+                                const nk = e.target.value;
+                                if (!nk) return;
+                                updateStep<Phase5SentencesStep>("phase5_sentences", (cur) => {
+                                  const next = [...(cur.sentences ?? [])];
+                                  next[idx] = nk;
+                                  return { ...cur, sentences: next };
+                                });
+                              }}
+                              className="max-w-lg rounded border border-slate-300 bg-white px-2 py-1.5 text-sm"
+                            >
+                              <option value="">Choose from TLTS…</option>
+                              {optionKeysForRow(stored, idx).map((k) => (
+                                <option key={k} value={k}>
+                                  {labelForKey(k)}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <span className={editorLabelL2Inline}>Sentence</span>
+                          <p className="text-sm text-amber-800">
+                            Add sentences in the TLTS tab first. Stored values use TLTS sentence ids.
+                          </p>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateStep<Phase5SentencesStep>("phase5_sentences", (cur) => ({
+                            ...cur,
+                            sentences: (cur.sentences ?? []).filter((_, i) => i !== idx),
+                          }))
+                        }
+                        className="shrink-0 text-sm text-red-600 hover:underline sm:mb-0.5"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  );
+                })}
                 <button
                   type="button"
-                  onClick={() =>
+                  disabled={
+                    !hasTlts ||
+                    firstUnusedTltsKey(tltsSentences, new Set(list)) === undefined
+                  }
+                  title={
+                    !hasTlts
+                      ? "Add TLTS sentences first"
+                      : firstUnusedTltsKey(tltsSentences, new Set(list)) === undefined
+                        ? "Every TLTS sentence is already listed"
+                        : undefined
+                  }
+                  onClick={() => {
+                    const free = firstUnusedTltsKey(tltsSentences, new Set(list));
+                    if (!free) return;
                     updateStep<Phase5SentencesStep>("phase5_sentences", (cur) => ({
                       ...cur,
-                      sentences: (cur.sentences ?? []).filter((_, i) => i !== idx),
-                    }))
-                  }
-                  className="text-xs text-red-600 hover:underline"
+                      sentences: [...(cur.sentences ?? []), free],
+                    }));
+                  }}
+                  className={`${editorAddPrimaryButton} disabled:cursor-not-allowed disabled:opacity-50`}
                 >
-                  Remove
+                  Add sentence
                 </button>
               </div>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() =>
-                updateStep<Phase5SentencesStep>("phase5_sentences", (cur) => ({
-                  ...cur,
-                  sentences: [...(cur.sentences ?? []), ""],
-                }))
-              }
-              className={editorAddPrimaryButton}
-            >
-              Add sentence
-            </button>
-          </div>
+            );
+          })()}
         </div>
       )}
     </div>

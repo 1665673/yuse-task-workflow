@@ -182,8 +182,11 @@ export function flattenTaskFlow(task: TaskPackage): {
       }
       if (step.type === "phase5_sentences") {
         const st = step as Phase5SentencesStep;
-        const sentences = st.sentences ?? [];
-        sentences.forEach((sentence, sentenceIndex) => {
+        const tltsS = (tlts?.sentences ?? {}) as Record<string, string>;
+        const resolveSentence = (stored: string) =>
+          Object.prototype.hasOwnProperty.call(tltsS, stored) ? String(tltsS[stored]) : stored;
+        (st.sentences ?? []).forEach((stored, sentenceIndex) => {
+          const sentence = resolveSentence(stored);
           flowItems.push({
             kind: "phase5_sentence",
             phaseIndex,
@@ -206,7 +209,7 @@ export function flattenTaskFlow(task: TaskPackage): {
             });
           }
         });
-        if (sentences.length === 0) {
+        if ((st.sentences ?? []).length === 0) {
           flowItems.push({
             kind: "phase5_sentence",
             phaseIndex,

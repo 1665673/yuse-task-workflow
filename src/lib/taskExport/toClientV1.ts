@@ -570,8 +570,13 @@ function buildClientPhases(data: Record<string, unknown>, taskModel: Record<stri
         };
         out.push(clientPhaseShell("phrasePractice", stepOut, reinforcement, PHASE_TITLE_EN.phrasePractice));
       } else if (stype === "phase5_sentences") {
-        const sentences = Array.isArray(step.sentences) ? step.sentences : [];
-        const questions = sentences.map((s) => sentenceToSortQuestion(String(s), tr));
+        const raw = Array.isArray(step.sentences) ? step.sentences : [];
+        const tltsS = asRecord(asRecord(taskModel.tlts)?.sentences) ?? {};
+        const questions = raw.map((s) => {
+          const id = String(s);
+          const resolved = tltsS[id] != null ? String(tltsS[id]) : id;
+          return sentenceToSortQuestion(resolved, tr);
+        });
         const stepOut = {
           id: "step-sentence-practice-1",
           type: "quiz",
