@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import type {
   Question,
@@ -737,9 +737,27 @@ interface TltSectionProps {
 }
 
 function TltSection({ label, items, prefix, onChange }: TltSectionProps) {
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [batchDraft, setBatchDraft] = useState("");
+
   const addItem = () => {
     const id = genTltId(prefix, items.map((i) => i.id));
     onChange([...items, { id, text: "" }]);
+  };
+
+  const applyBatchAdd = () => {
+    const lines = batchDraft.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    setBatchOpen(false);
+    setBatchDraft("");
+    if (lines.length === 0) return;
+    const ids = items.map((i) => i.id);
+    const next = [...items];
+    for (const text of lines) {
+      const id = genTltId(prefix, ids);
+      ids.push(id);
+      next.push({ id, text });
+    }
+    onChange(next);
   };
 
   const updateItem = (idx: number, text: string) => {
@@ -753,10 +771,28 @@ function TltSection({ label, items, prefix, onChange }: TltSectionProps) {
   };
 
   const singular = label.slice(0, -1).toLowerCase();
+  const batchModalTitleId = `tlt-batch-modal-${prefix}`;
 
   return (
+    <>
     <div className="space-y-3">
-      <p className={editorLabelL1}>{label}</p>
+      <div
+        className={`${editorLabelL1} flex w-full min-w-0 flex-wrap items-center justify-between gap-2 pr-3`}
+      >
+        <span className="min-w-0">{label}</span>
+        <button
+          type="button"
+          onClick={() => {
+            setBatchDraft("");
+            setBatchOpen(true);
+          }}
+          className="shrink-0 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+          aria-haspopup="dialog"
+          aria-expanded={batchOpen}
+        >
+          Batch add
+        </button>
+      </div>
       {items.length === 0 && (
         <p className="text-sm italic text-slate-400">No {label.toLowerCase()} yet.</p>
       )}
@@ -787,6 +823,58 @@ function TltSection({ label, items, prefix, onChange }: TltSectionProps) {
         Add {singular}
       </button>
     </div>
+
+    {batchOpen ? (
+      <div
+        className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4"
+        role="presentation"
+        onClick={(e) => e.target === e.currentTarget && setBatchOpen(false)}
+      >
+        <div
+          className="flex w-full max-w-lg flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-xl"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={batchModalTitleId}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <h2 id={batchModalTitleId} className="text-base font-semibold text-slate-900">
+            Batch add {label.toLowerCase()}
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Paste or type one entry per line. Empty lines are skipped.
+          </p>
+          <textarea
+            value={batchDraft}
+            onChange={(e) => setBatchDraft(e.target.value)}
+            rows={12}
+            className="mt-3 w-full resize-y rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            placeholder={"Line 1\nLine 2\n…"}
+            autoFocus
+          />
+          <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setBatchOpen(false);
+                setBatchDraft("");
+              }}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={applyBatchAdd}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              Add items
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null}
+    </>
   );
 }
 
@@ -867,6 +955,167 @@ function AllowedRolesMultiSelect({
   );
 }
 
+/** Split script lines into turns, cycling roles starting from `firstRoleId`. */
+function turnsFromScriptLines(
+  lines: string[],
+  roleIds: string[],
+  firstRoleId: string
+): DialogueTurn[] {
+  if (roleIds.length === 0 || lines.length === 0) return [];
+  const start = roleIds.includes(firstRoleId) ? roleIds.indexOf(firstRoleId) : 0;
+  return lines.map((text, i) => ({
+    role: roleIds[(start + i) % roleIds.length],
+    text,
+  }));
+}
+
+function AddDialogueByScriptModal({
+  roles,
+  onClose,
+  onConfirm,
+}: {
+  roles: NonNullable<TaskPackage["taskModel"]["roles"]>;
+  onClose: () => void;
+  onConfirm: (turns: DialogueTurn[]) => void;
+}) {
+  const roleIds = useMemo(() => roles.map((r, i) => dialoguesEditorRoleId(r, i)), [roles]);
+  const [draft, setDraft] = useState("");
+  const [firstRoleId, setFirstRoleId] = useState(roleIds[0] ?? "");
+
+  const lines = useMemo(
+    () => draft.split(/\r?\n/).map((l) => l.trim()).filter(Boolean),
+    [draft]
+  );
+
+  const previewTurns = useMemo(
+    () => turnsFromScriptLines(lines, roleIds, firstRoleId),
+    [lines, roleIds, firstRoleId]
+  );
+
+  const canConfirm = lines.length > 0 && roleIds.length > 0 && roleIds.includes(firstRoleId);
+
+  const handleConfirm = () => {
+    if (!canConfirm) return;
+    onConfirm(turnsFromScriptLines(lines, roleIds, firstRoleId));
+    onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4"
+      role="presentation"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        className="flex max-h-[90vh] w-full max-w-5xl flex-col rounded-2xl border border-slate-200 bg-white shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dialogue-script-modal-title"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="border-b border-slate-200 px-5 py-4">
+          <h2 id="dialogue-script-modal-title" className="text-lg font-semibold text-slate-900">
+            Add by script
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Creates a new dialogue with one turn per line. Speakers alternate in role order, starting with whoever speaks
+            first below.
+          </p>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div className="grid min-h-[16rem] gap-4 md:grid-cols-2 md:gap-6">
+            <div className="flex min-h-0 flex-col gap-3">
+              <label className="flex min-h-0 flex-1 flex-col gap-1.5 text-sm">
+                <span className={editorLabelL2Inline}>Script</span>
+                <textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  rows={12}
+                  className="min-h-[12rem] w-full flex-1 resize-y rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder={"First line…\nSecond line…"}
+                />
+              </label>
+
+              <fieldset className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2.5">
+                <legend className="px-0.5 text-sm font-medium text-slate-800">Who speaks first</legend>
+                {roleIds.length === 0 ? (
+                  <p className="text-xs text-amber-700">Add dialogue roles above first.</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {roles.map((r, i) => {
+                      const id = roleIds[i];
+                      const label = r.title?.trim() || id;
+                      return (
+                        <label
+                          key={id}
+                          className="flex cursor-pointer items-center gap-2 rounded-md border border-transparent px-1 py-0.5 text-sm text-slate-800 hover:bg-white"
+                        >
+                          <input
+                            type="radio"
+                            name="script-first-role"
+                            className="h-4 w-4 border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                            checked={firstRoleId === id}
+                            onChange={() => setFirstRoleId(id)}
+                          />
+                          <span>{label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </fieldset>
+            </div>
+
+            <div className="flex min-h-0 flex-col gap-1.5">
+              <span className={editorLabelL2Inline}>Preview</span>
+              <div className="min-h-[12rem] flex-1 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3">
+                {roleIds.length === 0 ? (
+                  <p className="text-sm text-slate-500">Add roles to preview.</p>
+                ) : !roleIds.includes(firstRoleId) ? (
+                  <p className="text-sm text-slate-500">Choose who speaks first.</p>
+                ) : previewTurns.length === 0 ? (
+                  <p className="text-sm text-slate-400">Type script lines on the left to preview turns.</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {previewTurns.map((turn, i) => (
+                      <li key={i} className="flex flex-wrap items-baseline gap-2">
+                        <span className="shrink-0 rounded-md border border-violet-200 bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-950">
+                          {taskRoleTitle(roles, turn.role)}
+                        </span>
+                        <span className="min-w-0 flex-1 text-sm leading-relaxed text-slate-800">{turn.text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!canConfirm}
+            onClick={handleConfirm}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskPackage) => void }) {
   const { isTargetMode } = useContext(TargetLangContext);
   const dialogues = task.taskModel.dialogues ?? [];
@@ -874,6 +1123,7 @@ function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: Ta
   const roles = task.taskModel.roles ?? [];
   const roleIds = roles.map((r, i) => dialoguesEditorRoleId(r, i));
   const defaultRoleId = roles.length ? dialoguesEditorRoleId(roles[0], 0) : "user";
+  const [scriptModalOpen, setScriptModalOpen] = useState(false);
 
   const setDialogues = (next: Dialogue[]) => {
     setTask({ ...task, taskModel: { ...task.taskModel, dialogues: next } });
@@ -1093,14 +1343,41 @@ function DialoguesEditor({ task, setTask }: { task: TaskPackage; setTask: (t: Ta
           </div>
         </div>
       ))}
-        <button
-          type="button"
-          onClick={addDialogue}
-          className={editorAddPrimaryButton}
-        >
-          Add dialogue
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={addDialogue}
+            className={editorAddPrimaryButton}
+          >
+            Add dialogue
+          </button>
+          <button
+            type="button"
+            disabled={isTargetMode || roles.length === 0}
+            onClick={() => setScriptModalOpen(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-300 bg-white px-5 py-2.5 text-sm font-semibold text-indigo-900 shadow-sm transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Add by Script
+          </button>
+        </div>
       </section>
+
+      {scriptModalOpen ? (
+        <AddDialogueByScriptModal
+          roles={roles}
+          onClose={() => setScriptModalOpen(false)}
+          onConfirm={(newTurns) => {
+            setDialogues([
+              ...dialogues,
+              {
+                id: `dlg_${Date.now()}`,
+                scope: "subtask",
+                turns: newTurns,
+              },
+            ]);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
