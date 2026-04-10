@@ -165,6 +165,25 @@ function taskAudioAssets(task: TaskPackage): AssetSelectItem[] {
 
 // ── Question Editor Components ────────────────────────────────────────────────
 
+/** New “Add question” rows use a default type per phase/section; users can still switch type in the dropdown. */
+function createEmptyQuestion(type: Question["type"]): Question {
+  const correctOptionIndexes = [0];
+  switch (type) {
+    case "audio_text":
+      return { type: "audio_text", stem: {}, options: [{ text: "" }], correctOptionIndexes };
+    case "text_image":
+      return { type: "text_image", stem: { text: "" }, options: [{}], correctOptionIndexes };
+    case "text_cloze":
+      return { type: "text_cloze", stem: { text: "" }, options: [{ text: "" }], correctOptionIndexes };
+    case "text_text":
+      return { type: "text_text", stem: { text: "" }, options: [{ text: "" }], correctOptionIndexes };
+    default: {
+      const _x: never = type;
+      return _x;
+    }
+  }
+}
+
 interface QuestionListEditorProps {
   questions: Question[];
   onChange: (next: Question[]) => void;
@@ -177,6 +196,8 @@ interface QuestionListEditorProps {
    * so the main “Add question” matches other nested controls.
    */
   addQuestionButtonLevel?: "primary" | "secondary";
+  /** Default type for newly added questions (existing rows keep their type). */
+  defaultQuestionType?: Question["type"];
 }
 
 function QuestionListEditor({
@@ -187,6 +208,7 @@ function QuestionListEditor({
   onCreateImageAsset,
   onCreateAudioAsset,
   addQuestionButtonLevel = "secondary",
+  defaultQuestionType = "text_text",
 }: QuestionListEditorProps) {
   const addQuestionBtnClass =
     addQuestionButtonLevel === "primary" ? editorAddPrimaryButton : editorAddSecondaryButton;
@@ -200,7 +222,7 @@ function QuestionListEditor({
   const removeQuestion = (idx: number) => onChange(questions.filter((_, i) => i !== idx));
 
   const addQuestion = () => {
-    onChange([...questions, { type: "text_text", stem: { text: "" }, options: [{ text: "" }], correctOptionIndexes: [0] }]);
+    onChange([...questions, createEmptyQuestion(defaultQuestionType)]);
   };
 
   const changeType = (idx: number, newType: Question["type"]) => {
@@ -1178,6 +1200,7 @@ function Phase2Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
           onCreateImageAsset={(a) => setTask(appendTaskAsset(task, "image", a))}
           onCreateAudioAsset={(a) => setTask(appendTaskAsset(task, "audio", a))}
           addQuestionButtonLevel="primary"
+          defaultQuestionType="text_text"
         />
       </div>
     </div>
@@ -1241,7 +1264,8 @@ function Phase3Editor({
     map: Record<string, Question[]>,
     onChange: (next: Record<string, Question[]>) => void,
     groupUi?: { selectLabel: string; add: string; remove: string },
-    tltsLookup?: Record<string, string>
+    tltsLookup?: Record<string, string>,
+    defaultQuestionType: Question["type"] = "text_text"
   ) => {
     const selectLabel = groupUi?.selectLabel ?? "Item";
     const addLabel = groupUi?.add ?? "Add group";
@@ -1379,6 +1403,7 @@ function Phase3Editor({
               audioAssets={taskAudioAssets(task)}
               onCreateImageAsset={onCreateImageAsset}
               onCreateAudioAsset={onCreateAudioAsset}
+              defaultQuestionType={defaultQuestionType}
             />
           </div>
         ))}
@@ -1421,7 +1446,8 @@ function Phase3Editor({
               (!wordGroupCopy
                 ? { selectLabel: "Word", add: "Add word", remove: "Remove word" }
                 : undefined),
-            tltsWords
+            tltsWords,
+            wordGroupCopy ? "audio_text" : "text_image"
           )}
         </div>
       )}
@@ -1436,7 +1462,8 @@ function Phase3Editor({
                 { ...phrasesStep, phraseQuestions: next }
               ),
             { selectLabel: "Phrase", add: "Add phrase", remove: "Remove phrase" },
-            task.taskModel.tlts.phrases ?? {}
+            task.taskModel.tlts.phrases ?? {},
+            "text_cloze"
           )}
         </div>
       )}
@@ -1451,7 +1478,8 @@ function Phase3Editor({
                 { ...sentencesStep, sentenceQuestions: next }
               ),
             { selectLabel: "Sentence", add: "Add sentence", remove: "Remove sentence" },
-            task.taskModel.tlts.sentences ?? {}
+            task.taskModel.tlts.sentences ?? {},
+            "text_text"
           )}
         </div>
       )}
@@ -1972,6 +2000,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                     audioAssets={taskAudioAssets(task)}
                     onCreateImageAsset={(a) => setTask(appendTaskAsset(task, "image", a))}
                     onCreateAudioAsset={(a) => setTask(appendTaskAsset(task, "audio", a))}
+                    defaultQuestionType="audio_text"
                   />
                 </div>
                 <div className="space-y-2">
