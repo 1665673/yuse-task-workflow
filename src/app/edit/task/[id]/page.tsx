@@ -2185,9 +2185,64 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: SetTask }
   const phrasesStep = findStep<Phase5PhrasesStep>("phase5_phrases");
   const sentencesStep = findStep<Phase5SentencesStep>("phase5_sentences");
 
+  /** Phase3Editor uses functional `setTask` updates; bridge them onto `phase5_words` on the real task. */
+  const phase5WordsSetTask: SetTask | undefined = wordsStep
+    ? (arg) => {
+        if (typeof arg === "function") {
+          setTask((prev) => {
+            if (!prev) return prev;
+            const { phase: reinforcePh, index: ri } = findPhase(prev, "reinforcement");
+            if (ri < 0 || !reinforcePh) return prev;
+            const curWs = reinforcePh.steps.find((s) => s.type === "phase5_words") as Phase5WordsStep | undefined;
+            if (!curWs) return prev;
+
+            const synthetic: TaskPackage = {
+              ...prev,
+              phases: [
+                {
+                  type: "phase3",
+                  steps: [{ ...curWs, type: "phase3_words" } as unknown as Phase3WordsStep],
+                } as Phase,
+              ],
+            };
+
+            const next = arg(synthetic);
+            if (!next) return prev;
+
+            const phase3 = next.phases[0];
+            if (!phase3) return prev;
+            const inner = phase3.steps.find((s) => s.type === "phase3_words") as Phase3WordsStep | undefined;
+            if (!inner) return prev;
+
+            const steps = [...reinforcePh.steps];
+            const si = steps.findIndex((s) => s.type === "phase5_words");
+            if (si < 0) return prev;
+            steps[si] = {
+              ...(steps[si] as Phase5WordsStep),
+              wordQuestions: inner.wordQuestions,
+            } as Step;
+            const phases = [...prev.phases];
+            phases[ri] = { ...reinforcePh, steps };
+            return { ...prev, phases };
+          });
+        } else if (arg === null) {
+          setTask(null);
+        } else {
+          const phase3 = arg.phases[0];
+          if (!phase3) return;
+          const ws =
+            (phase3.steps.find((s) => s.type === "phase3_words") as Phase3WordsStep | undefined) ?? wordsStep;
+          updateStep<Phase5WordsStep>("phase5_words", (cur) => ({
+            ...cur,
+            wordQuestions: ws.wordQuestions,
+          }));
+        }
+      }
+    : undefined;
+
   return (
     <div className="space-y-6">
-      {wordsStep && (
+      {wordsStep && phase5WordsSetTask && (
         <div className="space-y-3">
           <Phase3Editor
             wordTltsWords={task.taskModel.tlts.words ?? {}}
@@ -2211,16 +2266,7 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: SetTask }
                 } as Phase,
               ],
             }}
-            setTask={
-              ((nextTask: TaskPackage) => {
-                const phase3 = nextTask.phases[0];
-                const ws = (phase3.steps.find((s) => s.type === "phase3_words") as Phase3WordsStep) ?? wordsStep;
-                updateStep<Phase5WordsStep>("phase5_words", () => ({
-                  ...wordsStep,
-                  wordQuestions: ws.wordQuestions,
-                }));
-              }) as SetTask
-            }
+            setTask={phase5WordsSetTask}
             onCreateImageAsset={(a) => setTask((prev) => safeAppendTaskAsset(prev, "image", a))}
             onCreateAudioAsset={(a) => setTask((prev) => safeAppendTaskAsset(prev, "audio", a))}
           />
