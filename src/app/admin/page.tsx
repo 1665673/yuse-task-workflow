@@ -7,6 +7,11 @@ import {
   getStoredToken,
   setStoredToken,
 } from "@/lib/api";
+import {
+  adminLanguageToTaskModelCode,
+  buildEmptyTaskPackage,
+  taskIdFromTopic,
+} from "@/lib/empty-task-package";
 
 type TaskStatus = "draft" | "pending_review" | "production";
 
@@ -90,8 +95,14 @@ export default function AdminPage() {
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createLanguage, setCreateLanguage] = useState("English");
-  const [createTopic, setCreateTopic] = useState("");
-  const [creating, setCreating] = useState(false);
+  /** From AI tab — id auto-fills from topic until the user edits the id field. */
+  const [aiTopic, setAiTopic] = useState("");
+  const [aiTaskId, setAiTaskId] = useState("");
+  const aiIdUserTouchedRef = useRef(false);
+  /** Empty tab — title required; id auto-fills from title until the user edits the id field (same rules as AI). */
+  const [emptyTitle, setEmptyTitle] = useState("");
+  const [emptyTaskId, setEmptyTaskId] = useState("");
+  const emptyIdUserTouchedRef = useRef(false);
 
   const [langModalTaskId, setLangModalTaskId] = useState<string | null>(null);
 
@@ -105,10 +116,27 @@ export default function AdminPage() {
     isAdmin ??
     (userRole === "admin" || sessionUser.toLowerCase() === "admin");
 
+  type CreateTaskMode = "ai" | "import" | "empty";
+  const [createMode, setCreateMode] = useState<CreateTaskMode>("ai");
   const [aiWarning, setAiWarning] = useState(false);
-  const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  /** Parsed task package from file; Confirm POSTs after user edits title/id. */
+  const [importDraftData, setImportDraftData] = useState<Record<string, unknown> | null>(null);
+  const [importEditId, setImportEditId] = useState("");
+  const [importEditTitle, setImportEditTitle] = useState("");
+  const [importEditLanguage, setImportEditLanguage] = useState("English");
+  const [importParsing, setImportParsing] = useState(false);
+  const [importSubmitting, setImportSubmitting] = useState(false);
+  const [creatingEmpty, setCreatingEmpty] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
+
+  const resetImportDraft = () => {
+    setImportDraftData(null);
+    setImportEditId("");
+    setImportEditTitle("");
+    setImportEditLanguage("English");
+    setImportError(null);
+  };
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
@@ -181,10 +209,16 @@ export default function AdminPage() {
   };
 
   const openCreateModal = () => {
-    setCreateTopic("");
+    setAiTopic("");
+    setAiTaskId("");
+    aiIdUserTouchedRef.current = false;
+    setEmptyTitle("");
+    setEmptyTaskId("");
+    emptyIdUserTouchedRef.current = false;
     setCreateLanguage("English");
+    setCreateMode("ai");
     setAiWarning(false);
-    setImportError(null);
+    resetImportDraft();
     setCreateModalOpen(true);
   };
 
@@ -247,76 +281,146 @@ export default function AdminPage() {
     }
   };
 
-  const handleImportJson = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const taskModelLanguageToAdminLabel = (raw: unknown): string => {
+    if (raw === "en") return "English";
+    if (typeof raw === "string" && raw.trim()) return raw;
+    return "English";
+  };
+
+  const handleImportJsonFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setImporting(true);
+    setImportParsing(true);
     setImportError(null);
     try {
       const text = await file.text();
-      const taskJson = JSON.parse(text);
-      const id = taskJson.id ?? `task-${Date.now()}`;
-      const title = taskJson.title ?? file.name.replace(/\.json$/i, "");
-      const language =
-        taskJson.taskModelLanguage === "en"
-          ? "English"
-          : (taskJson.taskModelLanguage ?? "English");
-      const body = {
-        id,
-        title,
-        language,
-        status: "pending_review",
-        createdAt: new Date().toISOString(),
-        data: taskJson,
-      };
-      const res = await fetch("/api/tasks", {
-        method: "POST",
-        headers: authJsonHeaders(),
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error("Server returned an error");
-      const created = (await res.json()) as AdminTaskRow;
-      setTasks((prev) => [
-        { id: created.id, title: created.title, language: created.language, status: created.status, createdAt: created.createdAt },
-        ...prev,
-      ]);
-      setCreateModalOpen(false);
-      setAiWarning(false);
-      setImportError(null);
+      const parsed: unknown = JSON.parse(text);
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("JSON must be an object (task package).");
+      }
+      const taskJson = parsed as Record<string, unknown>;
+      const id =
+        typeof taskJson.id === "string" && taskJson.id.trim()
+          ? taskJson.id.trim()
+          : `task-${Date.now()}`;
+      const title =
+        typeof taskJson.title === "string" && taskJson.title.trim()
+          ? taskJson.title.trim()
+          : file.name.replace(/\.json$/i, "") || "Imported task";
+      setImportDraftData(taskJson);
+      setImportEditId(id);
+      setImportEditTitle(title);
+      setImportEditLanguage(taskModelLanguageToAdminLabel(taskJson.taskModelLanguage));
     } catch (err) {
       setImportError(
-        err instanceof Error ? err.message : "Failed to import — check that the file is valid task JSON."
+        err instanceof Error ? err.message : "Failed to read JSON — check that the file is valid task JSON."
       );
+      setImportDraftData(null);
+      setImportEditId("");
+      setImportEditTitle("");
+      setImportEditLanguage("English");
     } finally {
-      setImporting(false);
+      setImportParsing(false);
       if (importFileRef.current) importFileRef.current.value = "";
     }
   };
 
-  const handleConfirmCreate = async () => {
-    if (!createTopic.trim()) return;
-    setCreating(true);
+  const handleConfirmImportTask = async () => {
+    if (!importDraftData) return;
+    const id = importEditId.trim();
+    const title = importEditTitle.trim();
+    if (!id || !title) return;
+    setImportSubmitting(true);
+    setImportError(null);
     try {
-      const body: AdminTaskRow = {
-        id: `task-${Date.now()}`,
-        title: createTopic.trim(),
-        language: createLanguage,
-        status: "draft",
+      const data: Record<string, unknown> = {
+        ...importDraftData,
+        id,
+        title,
+      };
+      const body = {
+        id,
+        title,
+        language: importEditLanguage,
+        status: "pending_review" as const,
         createdAt: new Date().toISOString(),
+        data,
       };
       const res = await fetch("/api/tasks", {
         method: "POST",
         headers: authJsonHeaders(),
         body: JSON.stringify(body),
       });
-      const created = (await res.json()) as AdminTaskRow;
-      setTasks((prev) => [created, ...prev]);
+      const payload = (await res.json().catch(() => ({}))) as AdminTaskRow & { error?: string };
+      if (!res.ok) {
+        throw new Error(payload.error ?? `Could not create task (${res.status})`);
+      }
+      const created = payload as AdminTaskRow;
+      setTasks((prev) => [
+        {
+          id: created.id,
+          title: created.title,
+          language: created.language,
+          status: created.status,
+          createdAt: created.createdAt,
+        },
+        ...prev,
+      ]);
+      setCreateModalOpen(false);
+      setAiWarning(false);
+      resetImportDraft();
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "Failed to create task from import.");
+    } finally {
+      setImportSubmitting(false);
+    }
+  };
+
+  const handleCreateEmptyTask = async () => {
+    if (!emptyTitle.trim()) return;
+    setCreatingEmpty(true);
+    setImportError(null);
+    try {
+      const title = emptyTitle.trim();
+      const id = emptyTaskId.trim() || taskIdFromTopic(title || "task");
+      const data = buildEmptyTaskPackage({
+        id,
+        title,
+        taskModelLanguage: adminLanguageToTaskModelCode(createLanguage),
+      });
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: authJsonHeaders(),
+        body: JSON.stringify({
+          id,
+          title,
+          language: createLanguage,
+          status: "draft",
+          createdAt: new Date().toISOString(),
+          data,
+        }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as AdminTaskRow & { error?: string };
+      if (!res.ok) {
+        throw new Error(payload.error ?? `Could not create task (${res.status})`);
+      }
+      const created = payload as AdminTaskRow;
+      setTasks((prev) => [
+        {
+          id: created.id,
+          title: created.title,
+          language: created.language,
+          status: created.status,
+          createdAt: created.createdAt,
+        },
+        ...prev,
+      ]);
       setCreateModalOpen(false);
       router.push(`/edit/task/${created.id}`);
     } catch (e) {
-      console.error("Failed to create task", e);
+      setImportError(e instanceof Error ? e.message : "Failed to create empty task.");
     } finally {
-      setCreating(false);
+      setCreatingEmpty(false);
     }
   };
 
@@ -744,114 +848,290 @@ export default function AdminPage() {
 
       {createModalOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
-            <h2 className="mb-2 text-lg font-semibold text-slate-900">Create new task</h2>
-            <p className="mb-4 text-sm text-slate-600">
-              Choose the task language and enter a topic. AI backend will generate a new task based on the topic.
-            </p>
+          <div className="flex w-full max-w-md min-h-[36rem] flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
+            <h2 className="mb-3 shrink-0 text-lg font-semibold text-slate-900">Create new task</h2>
 
-            {/* AI create form */}
-            <div className="space-y-3">
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-slate-700">Language</span>
-                <select
-                  value={createLanguage}
-                  onChange={(e) => setCreateLanguage(e.target.value)}
-                  className="rounded border border-slate-300 px-2 py-1 text-sm"
+            <div
+              className="mb-4 flex shrink-0 rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs font-medium sm:text-sm"
+              role="tablist"
+              aria-label="Create task mode"
+            >
+              {(
+                [
+                  ["ai", "From AI"],
+                  ["empty", "Empty"],
+                  ["import", "Import JSON"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={createMode === key}
+                  onClick={() => {
+                    if (createMode === "import" && key !== "import") resetImportDraft();
+                    setCreateMode(key);
+                    setAiWarning(false);
+                    if (key === "import") setImportError(null);
+                  }}
+                  className={`flex-1 rounded-md px-2 py-2 transition sm:px-3 ${
+                    createMode === key
+                      ? "bg-slate-900 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-slate-200/80 hover:text-slate-900"
+                  }`}
                 >
-                  <option value="English">English</option>
-                </select>
-              </label>
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-slate-700">Task topic</span>
-                <input
-                  type="text"
-                  value={createTopic}
-                  onChange={(e) => setCreateTopic(e.target.value)}
-                  placeholder="e.g. Negotiating shipping terms"
-                  className="rounded border border-slate-300 px-2 py-1 text-sm"
-                />
-              </label>
+                  {label}
+                </button>
+              ))}
             </div>
 
-            {/* AI not-ready warning */}
-            {aiWarning && (
-              <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="mt-0.5 h-4 w-4 shrink-0 text-amber-500">
-                  <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" clipRule="evenodd" />
-                </svg>
-                Create By AI is not ready. Please use the <strong className="mx-0.5">Import</strong> button below to manually import a task JSON.
-              </div>
-            )}
-
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => { setCreateModalOpen(false); setAiWarning(false); setImportError(null); }}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => setAiWarning(true)}
-                disabled={!createTopic.trim()}
-                className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Confirm
-              </button>
-            </div>
-
-            {/* Manual import divider */}
-            <div className="my-5 flex items-center gap-3">
-              <hr className="flex-1 border-slate-200" />
-              <span className="text-xs text-slate-400">or</span>
-              <hr className="flex-1 border-slate-200" />
-            </div>
-
-            {/* Manual import section */}
-            <div className="space-y-3">
-              <div>
-                <p className="text-sm font-medium text-slate-700">Manual import from JSON</p>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  Choose a local <code className="rounded bg-slate-100 px-1">.json</code> file containing a valid task package. It will be added to the task list immediately.
+            <div className="flex min-h-[22rem] flex-1 flex-col">
+              {createMode === "ai" && (
+                <p className="mb-4 min-h-[4.5rem] text-sm leading-relaxed text-slate-600">
+                  Choose the task language and enter a topic. The AI backend will generate content from the topic when it is
+                  available.
                 </p>
-              </div>
+              )}
+              {createMode === "empty" && (
+                <p className="mb-4 min-h-[4.5rem] text-sm leading-relaxed text-slate-600">
+                  Creates a draft from the title and a minimal task package: all phases present, empty TLTS, assets, dialogues,
+                  and question maps—ready to fill in the editor. Task id follows the same auto-fill behavior as the AI tab,
+                  driven by title.
+                </p>
+              )}
+              {createMode === "import" && (
+                <p className="mb-4 min-h-[4.5rem] text-sm leading-relaxed text-slate-600">
+                  Choose a task package JSON. Title and task id load from the file (you can change them before creating).
+                  Re-import the same file to duplicate with a new id and title.
+                </p>
+              )}
 
-              {importError && (
-                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {createMode === "ai" && (
+                <div className="space-y-3">
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium text-slate-700">Language</span>
+                    <select
+                      value={createLanguage}
+                      onChange={(e) => setCreateLanguage(e.target.value)}
+                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                    >
+                      <option value="English">English</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium text-slate-700">Task topic</span>
+                    <input
+                      type="text"
+                      value={aiTopic}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setAiTopic(v);
+                        if (!aiIdUserTouchedRef.current) {
+                          const t = v.trim();
+                          setAiTaskId(t ? taskIdFromTopic(t) : "");
+                        }
+                      }}
+                      placeholder="e.g. Negotiating shipping terms"
+                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium text-slate-700">
+                      Task id <span className="font-normal text-slate-500">(optional)</span>
+                    </span>
+                    <input
+                      type="text"
+                      value={aiTaskId}
+                      onChange={(e) => {
+                        aiIdUserTouchedRef.current = true;
+                        setAiTaskId(e.target.value);
+                      }}
+                      placeholder="Auto-filled from topic; clear to generate on create"
+                      className="rounded border border-slate-300 px-2 py-1 font-mono text-sm"
+                    />
+                    <span className="text-xs text-slate-500">
+                      Updates from topic until you edit this field. If empty when AI create runs, an id is generated
+                      automatically.
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              {createMode === "empty" && (
+                <div className="space-y-3">
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium text-slate-700">Language</span>
+                    <select
+                      value={createLanguage}
+                      onChange={(e) => setCreateLanguage(e.target.value)}
+                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                    >
+                      <option value="English">English</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium text-slate-700">Title</span>
+                    <input
+                      type="text"
+                      value={emptyTitle}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setEmptyTitle(v);
+                        if (!emptyIdUserTouchedRef.current) {
+                          const t = v.trim();
+                          setEmptyTaskId(t ? taskIdFromTopic(t) : "");
+                        }
+                      }}
+                      placeholder="e.g. Negotiating shipping terms"
+                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium text-slate-700">
+                      Task id <span className="font-normal text-slate-500">(optional)</span>
+                    </span>
+                    <input
+                      type="text"
+                      value={emptyTaskId}
+                      onChange={(e) => {
+                        emptyIdUserTouchedRef.current = true;
+                        setEmptyTaskId(e.target.value);
+                      }}
+                      placeholder="Auto-filled from title; clear to generate on create"
+                      className="rounded border border-slate-300 px-2 py-1 font-mono text-sm"
+                    />
+                    <span className="text-xs text-slate-500">
+                      Updates from title until you edit this field. If empty when you create, an id is generated automatically.
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              {createMode === "import" && (
+                <div className="mt-1 flex flex-1 flex-col gap-3">
+                  <input
+                    ref={importFileRef}
+                    type="file"
+                    accept=".json,application/json"
+                    className="hidden"
+                    onChange={handleImportJsonFile}
+                  />
+                  <button
+                    type="button"
+                    disabled={importParsing}
+                    onClick={() => importFileRef.current?.click()}
+                    className="flex w-full min-h-[5rem] shrink-0 items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {importParsing ? (
+                      "Reading file…"
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                          <path d="M9.25 13.25a.75.75 0 0 0 1.5 0V4.636l2.955 3.129a.75.75 0 0 0 1.09-1.03l-4.25-4.5a.75.75 0 0 0-1.09 0l-4.25 4.5a.75.75 0 1 0 1.09 1.03L9.25 4.636v8.614z" />
+                          <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
+                        </svg>
+                        Choose JSON file
+                      </>
+                    )}
+                  </button>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className={`font-medium ${importDraftData ? "text-slate-700" : "text-slate-400"}`}>Task title</span>
+                    <input
+                      type="text"
+                      value={importEditTitle}
+                      onChange={(e) => setImportEditTitle(e.target.value)}
+                      disabled={!importDraftData}
+                      placeholder="Load a JSON file first"
+                      className="rounded border border-slate-300 px-2 py-1.5 text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:placeholder:text-slate-400"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className={`font-medium ${importDraftData ? "text-slate-700" : "text-slate-400"}`}>Task id</span>
+                    <input
+                      type="text"
+                      value={importEditId}
+                      onChange={(e) => setImportEditId(e.target.value)}
+                      disabled={!importDraftData}
+                      placeholder="Load a JSON file first"
+                      className="rounded border border-slate-300 px-2 py-1.5 font-mono text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:placeholder:text-slate-400"
+                    />
+                  </label>
+                  <p className="text-xs text-slate-500">
+                    List language:{" "}
+                    <span className="font-medium text-slate-600">{importDraftData ? importEditLanguage : "—"}</span>{" "}
+                    (from JSON <code className="rounded bg-slate-100 px-1">taskModelLanguage</code>)
+                  </p>
+                </div>
+              )}
+
+              {createMode === "ai" && aiWarning && (
+                <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="mt-0.5 h-4 w-4 shrink-0 text-amber-500">
+                    <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" clipRule="evenodd" />
+                  </svg>
+                  Create by AI is not ready. Use <strong className="mx-0.5">Empty</strong> to start from a skeleton, or{" "}
+                  <strong className="mx-0.5">Import JSON</strong> to load a file.
+                </div>
+              )}
+
+              {importError && (createMode === "import" || createMode === "empty") && (
+                <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="mt-0.5 h-4 w-4 shrink-0 text-red-400">
                     <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
                   </svg>
                   {importError}
                 </div>
               )}
+            </div>
 
-              <input
-                ref={importFileRef}
-                type="file"
-                accept=".json,application/json"
-                className="hidden"
-                onChange={handleImportJson}
-              />
+            <div className="mt-auto flex shrink-0 flex-wrap justify-end gap-2 pt-2">
               <button
                 type="button"
-                disabled={importing}
-                onClick={() => importFileRef.current?.click()}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => {
+                  setCreateModalOpen(false);
+                  setAiWarning(false);
+                  resetImportDraft();
+                }}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
               >
-                {importing ? (
-                  "Importing…"
-                ) : (
-                  <>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                      <path d="M9.25 13.25a.75.75 0 0 0 1.5 0V4.636l2.955 3.129a.75.75 0 0 0 1.09-1.03l-4.25-4.5a.75.75 0 0 0-1.09 0l-4.25 4.5a.75.75 0 1 0 1.09 1.03L9.25 4.636v8.614z" />
-                      <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
-                    </svg>
-                    Choose JSON file to import
-                  </>
-                )}
+                Cancel
               </button>
+              {createMode === "ai" && (
+                <button
+                  type="button"
+                  onClick={() => setAiWarning(true)}
+                  disabled={!aiTopic.trim()}
+                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Confirm
+                </button>
+              )}
+              {createMode === "empty" && (
+                <button
+                  type="button"
+                  onClick={() => void handleCreateEmptyTask()}
+                  disabled={!emptyTitle.trim() || creatingEmpty}
+                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {creatingEmpty ? "Creating…" : "Create empty task"}
+                </button>
+              )}
+              {createMode === "import" && (
+                <button
+                  type="button"
+                  onClick={() => void handleConfirmImportTask()}
+                  disabled={
+                    !importDraftData ||
+                    !importEditId.trim() ||
+                    !importEditTitle.trim() ||
+                    importParsing ||
+                    importSubmitting
+                  }
+                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {importSubmitting ? "Creating…" : "Confirm"}
+                </button>
+              )}
             </div>
           </div>
         </div>
