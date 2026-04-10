@@ -187,9 +187,19 @@ export interface Phase5PhrasesStep extends BaseStep {
   phraseClozes?: { [phraseId: string]: PhraseClozeEntry };
 }
 
+/** Per-sentence metadata for Phase 5 sentence reconstruction (word-order); text comes from TLTS. */
+export interface Phase5SentenceReconstructionEntry {
+  /** Optional reference clip for this sentence (e.g. model pronunciation). */
+  audioAssetId?: string;
+}
+
 export interface Phase5SentencesStep extends BaseStep {
   type: "phase5_sentences";
-  sentences: string[];
+  /**
+   * Sentence IDs (keys in `taskModel.tlts.sentences`) → reference audio asset id.
+   * Legacy `sentences: string[]` is deprecated; normalized away on load.
+   */
+  sentenceReconstructions: { [sentenceId: string]: Phase5SentenceReconstructionEntry };
 }
 
 export interface Phase6RoleplayEntry {

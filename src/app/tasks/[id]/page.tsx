@@ -554,6 +554,11 @@ export default function TaskDemoPage() {
               <Phase5SentenceView
                 key={`flow-${flowIndex}`}
                 item={item}
+                referenceAudioUrl={
+                  item.audioAssetId
+                    ? task.taskModel.assets?.audios?.[item.audioAssetId]?.url
+                    : undefined
+                }
                 onContinue={handleFlowContinue}
               />
             )}

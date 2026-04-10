@@ -4,6 +4,47 @@ function isRecord(x: unknown): x is Record<string, unknown> {
   return x != null && typeof x === "object" && !Array.isArray(x);
 }
 
+/** Legacy phase5 used `sentences: string[]` (ids or raw text); migrate to `sentenceReconstructions`. */
+function resolveLegacySentenceId(raw: string, tltsS: Record<string, string>): string {
+  const s = String(raw).trim();
+  if (!s) return s;
+  if (Object.prototype.hasOwnProperty.call(tltsS, s)) return s;
+  for (const [id, text] of Object.entries(tltsS)) {
+    if (String(text).trim() === s) return id;
+  }
+  return s;
+}
+
+function normalizePhase5SentencesStep(
+  step: Record<string, unknown>,
+  tltsSentences: Record<string, string>
+): Record<string, unknown> {
+  const merged: Record<string, { audioAssetId?: string }> = {};
+  const srIn = step.sentenceReconstructions;
+  if (isRecord(srIn)) {
+    for (const [k, v] of Object.entries(srIn)) {
+      const ent = isRecord(v) ? v : {};
+      const aid = ent.audioAssetId;
+      merged[k] =
+        typeof aid === "string" && aid.trim() ? { audioAssetId: aid.trim() } : {};
+    }
+  }
+  const legacy = step.sentences;
+  if (Array.isArray(legacy)) {
+    for (const item of legacy) {
+      const id = resolveLegacySentenceId(String(item), tltsSentences);
+      if (!id) continue;
+      if (!merged[id]) merged[id] = {};
+    }
+  }
+  const { sentences: _drop, ...rest } = step;
+  return {
+    ...rest,
+    type: "phase5_sentences",
+    sentenceReconstructions: merged,
+  };
+}
+
 /**
  * Backend stores the learner JSON in Mongo `data`. Some proxies or mistakes may return
  * the envelope `{ taskId, title, data: TaskPackage }` instead of the inner package.
@@ -62,9 +103,20 @@ export function normalizeTaskPackage(raw: unknown): TaskPackage | null {
   const phasesRaw = base.phases;
   if (!Array.isArray(phasesRaw)) return null;
 
+  const tm = defaultTaskModel(base.taskModel);
+  const tltsS = tm.tlts.sentences as Record<string, string>;
+
   const phases = phasesRaw.map((p) => {
     if (!isRecord(p)) return { type: "", steps: [] };
-    return { ...p, steps: Array.isArray(p.steps) ? p.steps : [] };
+    const steps = Array.isArray(p.steps) ? p.steps : [];
+    return {
+      ...p,
+      steps: steps.map((s) => {
+        if (!isRecord(s)) return s;
+        if (s.type === "phase5_sentences") return normalizePhase5SentencesStep(s, tltsS);
+        return s;
+      }),
+    };
   });
 
   const translations = isRecord(base.translations)
@@ -78,7 +130,7 @@ export function normalizeTaskPackage(raw: unknown): TaskPackage | null {
     description: String(base.description ?? ""),
     taskModelLanguage: String(base.taskModelLanguage ?? ""),
     nativeLanguage: String(base.nativeLanguage ?? ""),
-    taskModel: defaultTaskModel(base.taskModel),
+    taskModel: tm,
     phases: phases as TaskPackage["phases"],
     translations,
     locales: isRecord(base.locales) ? (base.locales as TaskPackage["locales"]) : undefined,

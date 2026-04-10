@@ -570,10 +570,17 @@ function buildClientPhases(data: Record<string, unknown>, taskModel: Record<stri
         };
         out.push(clientPhaseShell("phrasePractice", stepOut, reinforcement, PHASE_TITLE_EN.phrasePractice));
       } else if (stype === "phase5_sentences") {
-        const raw = Array.isArray(step.sentences) ? step.sentences : [];
         const tltsS = asRecord(asRecord(taskModel.tlts)?.sentences) ?? {};
-        const questions = raw.map((s) => {
-          const id = String(s);
+        const sr = asRecord((step as { sentenceReconstructions?: unknown }).sentenceReconstructions) ?? {};
+        const legacy = Array.isArray((step as { sentences?: unknown }).sentences)
+          ? ((step as { sentences: unknown[] }).sentences as unknown[])
+          : [];
+        const idsFromDict = Object.keys(sr);
+        const ids =
+          idsFromDict.length > 0
+            ? idsFromDict
+            : legacy.map((s) => String(s));
+        const questions = ids.map((id) => {
           const resolved = tltsS[id] != null ? String(tltsS[id]) : id;
           return sentenceToSortQuestion(resolved, tr);
         });

@@ -6,6 +6,8 @@ import type { Phase5SentenceItem } from "@/lib/task-utils";
 interface Phase5SentenceViewProps {
   item: Phase5SentenceItem;
   onContinue: () => void;
+  /** Resolved URL for optional `audioAssetId` on the step entry (model pronunciation). */
+  referenceAudioUrl?: string;
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -17,7 +19,7 @@ function shuffle<T>(arr: T[]): T[] {
   return out;
 }
 
-export function Phase5SentenceView({ item, onContinue }: Phase5SentenceViewProps) {
+export function Phase5SentenceView({ item, onContinue, referenceAudioUrl }: Phase5SentenceViewProps) {
   const { sentence } = item;
   const words = useMemo(
     () => (sentence ? sentence.trim().split(/\s+/) : []).filter(Boolean),
@@ -67,6 +69,13 @@ export function Phase5SentenceView({ item, onContinue }: Phase5SentenceViewProps
       <p className="text-sm text-slate-500">
         Sentence {item.sentenceIndex + 1}: Tap words in order to form the sentence.
       </p>
+
+      {referenceAudioUrl ? (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <audio controls src={referenceAudioUrl} className="w-full" />
+        </div>
+      ) : null}
 
       {/* Built sentence (slots) */}
       <div className="min-h-[3rem] rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 p-3">

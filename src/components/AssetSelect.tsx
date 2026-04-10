@@ -3,13 +3,114 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { authMultipartHeaders } from "@/lib/api";
-import { genAssetId } from "@/lib/asset-utils";
+import { genAssetId, isDataUrl } from "@/lib/asset-utils";
 import { AudioRecordModal } from "@/components/AudioRecordModal";
 
 /** Mark portaled new-asset UI so AssetSelect’s document listener ignores pointer events there. */
 const ASSET_SELECT_NEW_MODAL_ATTR = "data-asset-select-new-modal";
 
 const NEW_ASSET_PROMPT_REQUIRED_MSG = "Enter a description (prompt) for this asset.";
+
+function extFromDataUrl(url: string): string | null {
+  const m = /^data:([^;,]+)/i.exec(url);
+  if (!m) return null;
+  const mime = m[1].toLowerCase();
+  if (mime.includes("png")) return "png";
+  if (mime.includes("jpeg") || mime.includes("jpg")) return "jpg";
+  if (mime.includes("webp")) return "webp";
+  if (mime.includes("gif")) return "gif";
+  if (mime.includes("svg")) return "svg";
+  if (mime.includes("wav")) return "wav";
+  if (mime.includes("mpeg") || mime.includes("mp3")) return "mp3";
+  if (mime.includes("webm")) return "webm";
+  if (mime.includes("ogg")) return "ogg";
+  if (mime.includes("mp4") || mime.includes("m4a") || mime.includes("x-m4a")) return "m4a";
+  return null;
+}
+
+function extFromHttpUrl(url: string, fallback: string): string {
+  try {
+    const path = new URL(url, "https://example.com").pathname;
+    const dot = path.lastIndexOf(".");
+    if (dot >= 0) {
+      const ext = path
+        .slice(dot + 1)
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+      if (ext.length >= 2 && ext.length <= 8) return ext;
+    }
+  } catch {
+    /* ignore */
+  }
+  return fallback;
+}
+
+function formatSuffixForAsset(url: string, kind: "image" | "audio"): string {
+  const trimmed = url.trim();
+  if (!trimmed) return kind === "image" ? "png" : "mp3";
+  if (isDataUrl(trimmed)) {
+    const e = extFromDataUrl(trimmed);
+    if (e) return e;
+  }
+  const fb = kind === "image" ? "png" : "mp3";
+  if (/^https?:/i.test(trimmed)) return extFromHttpUrl(trimmed, fb);
+  return fb;
+}
+
+function sanitizeFilenameSegment(s: string): string {
+  const t = s
+    .trim()
+    .replace(/[/\\?%*:|"<>]/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 120);
+  return t || "untitled";
+}
+
+function buildAssetDownloadFilename(id: string, prompt: string, url: string, kind: "image" | "audio"): string {
+  const suffix = formatSuffixForAsset(url, kind);
+  const p = sanitizeFilenameSegment(prompt || "untitled");
+  const safeId = id.replace(/[/\\?%*:|"<>]/g, "_");
+  return `${safeId}-${p}.${suffix}`;
+}
+
+async function triggerAssetDownload(opt: AssetSelectItem, kind: "image" | "audio"): Promise<void> {
+  const url = opt.url?.trim();
+  if (!url) return;
+  const filename = buildAssetDownloadFilename(opt.id, opt.prompt, url, kind);
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = filename;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(href);
+  } catch {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.rel = "noopener";
+    a.target = "_blank";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+}
+
+function DownloadIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className ?? "h-4 w-4"}>
+      <path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75z" />
+      <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
+    </svg>
+  );
+}
 
 export interface AssetSelectItem {
   id: string;
@@ -379,22 +480,40 @@ export function AssetSelect({
               — none —
             </button>
             {options.map((opt) => (
-              <button
+              <div
                 key={opt.id}
-                type="button"
-                onClick={() => {
-                  onChange(opt.id);
-                  setOpen(false);
-                }}
-                className="flex w-full items-center gap-2 px-2 py-1.5 text-sm hover:bg-blue-50"
+                className="flex w-full min-w-0 items-center gap-1 px-1 py-0.5 hover:bg-blue-50"
               >
-                {type === "image" && (
-                  <img src={opt.url || undefined} alt="" className="h-7 w-7 shrink-0 rounded bg-slate-100 object-cover" />
-                )}
-                {type === "audio" && <AudioInlinePlay url={opt.url} />}
-                <span className="flex-1 truncate text-slate-700">{opt.prompt || opt.id}</span>
-                <span className="shrink-0 font-mono text-xs text-slate-400">{opt.id}</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.id);
+                    setOpen(false);
+                  }}
+                  className="flex min-w-0 flex-1 items-center gap-2 px-1 py-1 text-left text-sm"
+                >
+                  {type === "image" && (
+                    <img src={opt.url || undefined} alt="" className="h-7 w-7 shrink-0 rounded bg-slate-100 object-cover" />
+                  )}
+                  {type === "audio" && <AudioInlinePlay url={opt.url} />}
+                  <span className="min-w-0 flex-1 truncate text-slate-700">{opt.prompt || opt.id}</span>
+                  <span className="shrink-0 font-mono text-xs text-slate-400">{opt.id}</span>
+                </button>
+                <button
+                  type="button"
+                  title="Download file"
+                  disabled={!opt.url?.trim()}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void triggerAssetDownload(opt, type);
+                  }}
+                  className="shrink-0 rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-30"
+                  aria-label={`Download ${opt.id}`}
+                >
+                  <DownloadIcon className="h-4 w-4" />
+                </button>
+              </div>
             ))}
           </div>
         )}

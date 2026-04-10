@@ -137,7 +137,7 @@ export function buildEmptyTaskPackage(opts: {
           {
             id: "phase5_sentences",
             type: "phase5_sentences",
-            sentences: [],
+            sentenceReconstructions: {},
           },
         ],
       },

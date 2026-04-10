@@ -2392,106 +2392,140 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
       {sentencesStep && (
         <div className="space-y-3">
           <p className={editorLabelL1}>Sentences</p>
+          <p className="text-sm text-slate-600">
+            Each card picks a TLTS sentence id; the learner sees the sentence text from TLTS for word-order practice.
+          </p>
           {(() => {
             const tltsSentences = task.taskModel.tlts.sentences ?? {};
-            const list = sentencesStep.sentences ?? [];
+            const map = sentencesStep.sentenceReconstructions ?? {};
             const hasTlts = Object.keys(tltsSentences).length > 0;
             const labelForKey = (k: string) => (tltsSentences[k] ?? "").trim() || "—";
-            const usedElsewhere = (key: string, at: number) =>
-              list.some((v, i) => v === key && i !== at);
-            const optionKeysForRow = (stored: string, idx: number) =>
-              Object.keys(tltsSentences).filter((k) => k === stored || !usedElsewhere(k, idx));
 
             return (
-              <div className="space-y-2">
-                {!hasTlts && list.length === 0 ? (
+              <div className="space-y-3">
+                {!hasTlts && Object.keys(map).length === 0 ? (
                   <p className="text-sm text-slate-600">
-                    Add sentence entries in the TLTS tab first, then add rows here.
+                    Add sentence entries in the TLTS tab first, then add cards here.
                   </p>
                 ) : null}
-                {list.map((stored, idx) => {
-                  const inTlts = Object.prototype.hasOwnProperty.call(tltsSentences, stored);
+                {Object.entries(map).map(([sentenceId, entry]) => {
+                  const inTlts = Object.prototype.hasOwnProperty.call(tltsSentences, sentenceId);
+                  const takenElsewhere = new Set(Object.keys(map).filter((k) => k !== sentenceId));
+                  const optionKeys = Object.keys(tltsSentences).filter(
+                    (k) => k === sentenceId || !takenElsewhere.has(k)
+                  );
                   return (
                     <div
-                      key={`${idx}-${stored}`}
-                      className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3"
+                      key={sentenceId}
+                      className="space-y-3 rounded-lg border border-slate-200 border-l-4 border-l-teal-500 bg-white p-4 shadow-sm"
                     >
-                      {hasTlts && inTlts ? (
-                        <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
-                          <span className={editorLabelL2Inline}>Sentence</span>
-                          <select
-                            value={stored}
-                            onChange={(e) => {
-                              const nk = e.target.value;
-                              if (!nk || nk === stored) return;
-                              updateStep<Phase5SentencesStep>("phase5_sentences", (cur) => {
-                                const next = [...(cur.sentences ?? [])];
-                                next[idx] = nk;
-                                return { ...cur, sentences: next };
-                              });
-                            }}
-                            className="max-w-lg rounded border border-slate-300 bg-white px-2 py-1.5 text-sm"
-                          >
-                            {optionKeysForRow(stored, idx).map((k) => (
-                              <option key={k} value={k}>
-                                {labelForKey(k)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      ) : hasTlts && !inTlts ? (
-                        <div className="min-w-0 flex-1 space-y-2">
-                          <span className={editorLabelL2Inline}>Sentence</span>
-                          <p className="text-sm text-amber-800">
-                            This row is not linked to TLTS. Choose a sentence below or remove the row.
-                          </p>
-                          {optionKeysForRow(stored, idx).length === 0 ? (
-                            <p className="text-sm text-amber-800">
-                              No free TLTS slots. Remove another row or add entries in the TLTS tab.
-                            </p>
-                          ) : (
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                        {hasTlts && inTlts ? (
+                          <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+                            <span className={editorLabelL2Inline}>Sentence</span>
                             <select
-                              value=""
+                              value={sentenceId}
                               onChange={(e) => {
-                                const nk = e.target.value;
-                                if (!nk) return;
-                                updateStep<Phase5SentencesStep>("phase5_sentences", (cur) => {
-                                  const next = [...(cur.sentences ?? [])];
-                                  next[idx] = nk;
-                                  return { ...cur, sentences: next };
-                                });
+                                const newKey = e.target.value;
+                                if (!newKey || newKey === sentenceId) return;
+                                if (map[newKey]) return;
+                                const next: typeof map = {};
+                                for (const [k, v] of Object.entries(map)) {
+                                  next[k === sentenceId ? newKey : k] = v;
+                                }
+                                updateStep<Phase5SentencesStep>("phase5_sentences", (cur) => ({
+                                  ...cur,
+                                  sentenceReconstructions: next,
+                                }));
                               }}
                               className="max-w-lg rounded border border-slate-300 bg-white px-2 py-1.5 text-sm"
                             >
-                              <option value="">Choose from TLTS…</option>
-                              {optionKeysForRow(stored, idx).map((k) => (
+                              {optionKeys.map((k) => (
                                 <option key={k} value={k}>
                                   {labelForKey(k)}
                                 </option>
                               ))}
                             </select>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <span className={editorLabelL2Inline}>Sentence</span>
-                          <p className="text-sm text-amber-800">
-                            Add sentences in the TLTS tab first. Stored values use TLTS sentence ids.
-                          </p>
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateStep<Phase5SentencesStep>("phase5_sentences", (cur) => ({
-                            ...cur,
-                            sentences: (cur.sentences ?? []).filter((_, i) => i !== idx),
-                          }))
-                        }
-                        className="shrink-0 text-sm text-red-600 hover:underline sm:mb-0.5"
-                      >
-                        Remove
-                      </button>
+                          </label>
+                        ) : hasTlts && !inTlts ? (
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <span className={editorLabelL2Inline}>Sentence</span>
+                            <p className="text-sm text-amber-800">
+                              This card is not linked to TLTS. Pick a sentence below or remove the card.
+                            </p>
+                            {optionKeys.length === 0 ? (
+                              <p className="text-sm text-amber-800">
+                                No free TLTS slots. Remove another card or add entries in the TLTS tab.
+                              </p>
+                            ) : (
+                              <select
+                                value=""
+                                onChange={(e) => {
+                                  const nk = e.target.value;
+                                  if (!nk) return;
+                                  const next: typeof map = {};
+                                  for (const [k, v] of Object.entries(map)) {
+                                    next[k === sentenceId ? nk : k] = v;
+                                  }
+                                  updateStep<Phase5SentencesStep>("phase5_sentences", (cur) => ({
+                                    ...cur,
+                                    sentenceReconstructions: next,
+                                  }));
+                                }}
+                                className="max-w-lg rounded border border-slate-300 bg-white px-2 py-1.5 text-sm"
+                              >
+                                <option value="">Choose from TLTS…</option>
+                                {optionKeys.map((k) => (
+                                  <option key={k} value={k}>
+                                    {labelForKey(k)}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <span className={editorLabelL2Inline}>Sentence</span>
+                            <p className="text-sm text-amber-800">
+                              Add sentences in the TLTS tab first. Cards reference TLTS sentence ids.
+                            </p>
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next: typeof map = { ...map };
+                            delete next[sentenceId];
+                            updateStep<Phase5SentencesStep>("phase5_sentences", (cur) => ({
+                              ...cur,
+                              sentenceReconstructions: next,
+                            }));
+                          }}
+                          className="shrink-0 text-sm text-red-600 hover:underline sm:mb-0.5"
+                        >
+                          Remove sentence
+                        </button>
+                      </div>
+                      <label className="flex flex-col gap-1 text-sm">
+                        <span className={editorLabelL2Inline}>Sentence Audio</span>
+                        <AssetSelect
+                          type="audio"
+                          value={entry.audioAssetId}
+                          options={taskAudioAssets(task)}
+                          onChange={(id) =>
+                            updateStep<Phase5SentencesStep>("phase5_sentences", (cur) => ({
+                              ...cur,
+                              sentenceReconstructions: {
+                                ...(cur.sentenceReconstructions ?? {}),
+                                [sentenceId]: { ...entry, audioAssetId: id || undefined },
+                              },
+                            }))
+                          }
+                          allowAddAsset={!isTargetMode}
+                          disabled={isTargetMode}
+                          onCreateAsset={(a) => setTask(appendTaskAsset(task, "audio", a))}
+                        />
+                      </label>
                     </div>
                   );
                 })}
@@ -2499,21 +2533,21 @@ function Phase5Editor({ task, setTask }: { task: TaskPackage; setTask: (t: TaskP
                   type="button"
                   disabled={
                     !hasTlts ||
-                    firstUnusedTltsKey(tltsSentences, new Set(list)) === undefined
+                    firstUnusedTltsKey(tltsSentences, new Set(Object.keys(map))) === undefined
                   }
                   title={
                     !hasTlts
                       ? "Add TLTS sentences first"
-                      : firstUnusedTltsKey(tltsSentences, new Set(list)) === undefined
-                        ? "Every TLTS sentence is already listed"
+                      : firstUnusedTltsKey(tltsSentences, new Set(Object.keys(map))) === undefined
+                        ? "Every TLTS sentence is already used in a card"
                         : undefined
                   }
                   onClick={() => {
-                    const free = firstUnusedTltsKey(tltsSentences, new Set(list));
+                    const free = firstUnusedTltsKey(tltsSentences, new Set(Object.keys(map)));
                     if (!free) return;
                     updateStep<Phase5SentencesStep>("phase5_sentences", (cur) => ({
                       ...cur,
-                      sentences: [...(cur.sentences ?? []), free],
+                      sentenceReconstructions: { ...(cur.sentenceReconstructions ?? {}), [free]: {} },
                     }));
                   }}
                   className={`${editorAddPrimaryButton} disabled:cursor-not-allowed disabled:opacity-50`}

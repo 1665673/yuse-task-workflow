@@ -46,7 +46,10 @@ export interface Phase5SentenceItem {
   phaseIndex: number;
   stepIndex: number;
   sentenceIndex: number;
+  /** TLTS sentence id (`tlts.sentences` key). */
+  sentenceId: string;
   sentence: string;
+  audioAssetId?: string;
   step: Phase5SentencesStep;
   phase: Phase;
 }
@@ -169,16 +172,23 @@ export function flattenTaskFlow(task: TaskPackage): {
       if (step.type === "phase5_sentences") {
         const st = step as Phase5SentencesStep;
         const tltsS = (tlts?.sentences ?? {}) as Record<string, string>;
-        const resolveSentence = (stored: string) =>
-          Object.prototype.hasOwnProperty.call(tltsS, stored) ? String(tltsS[stored]) : stored;
-        (st.sentences ?? []).forEach((stored, sentenceIndex) => {
-          const sentence = resolveSentence(stored);
+        const resolveSentence = (sentenceId: string) =>
+          Object.prototype.hasOwnProperty.call(tltsS, sentenceId)
+            ? String(tltsS[sentenceId])
+            : sentenceId;
+        const sr = st.sentenceReconstructions ?? {};
+        const ids = Object.keys(sr);
+        ids.forEach((sentenceId, sentenceIndex) => {
+          const entry = sr[sentenceId] ?? {};
+          const sentence = resolveSentence(sentenceId);
           flowItems.push({
             kind: "phase5_sentence",
             phaseIndex,
             stepIndex,
             sentenceIndex,
+            sentenceId,
             sentence,
+            audioAssetId: entry.audioAssetId,
             step: st,
             phase,
           });
@@ -195,12 +205,13 @@ export function flattenTaskFlow(task: TaskPackage): {
             });
           }
         });
-        if ((st.sentences ?? []).length === 0) {
+        if (ids.length === 0) {
           flowItems.push({
             kind: "phase5_sentence",
             phaseIndex,
             stepIndex,
             sentenceIndex: 0,
+            sentenceId: "",
             sentence: "",
             step: st,
             phase,
